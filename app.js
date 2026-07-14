@@ -311,6 +311,26 @@
 
   // ---------- init ----------
 
+  var deferredPrompt = null;
+  window.addEventListener("beforeinstallprompt", function (e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    var btn = document.getElementById("install-btn");
+    btn.classList.remove("hidden");
+    btn.addEventListener("click", function () {
+      btn.classList.add("hidden");
+      deferredPrompt.prompt();
+    });
+  });
+
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("service-worker.js").catch(function (err) {
+        console.error("Axis: service worker registration failed", err);
+      });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     initAuthUI();
     initNav();
