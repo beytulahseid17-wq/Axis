@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Axis — your life OS</title>
+<meta name="description" content="Daily habits, financial tracking, trips, and goals in one dashboard.">
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#16181D">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+</head>
+<body>
+
+<!-- ========== Auth screen ========== -->
+<div id="auth-screen" class="auth-screen">
+  <div class="wordmark" style="margin-bottom:2rem;">AXIS <span>OS</span></div>
+  <h1 id="auth-title">Log in</h1>
+  <p class="sub">Your life, tracked in one place.</p>
+  <form id="auth-form" class="auth-form">
+    <input type="email" id="auth-email" placeholder="Email" autocomplete="email" required>
+    <input type="password" id="auth-password" placeholder="Password" autocomplete="current-password" required>
+    <button type="submit" id="auth-submit">Log in</button>
+  </form>
+  <p id="auth-error" class="auth-error hidden"></p>
+  <button type="button" id="auth-toggle" class="text-btn">Don't have an account? Sign up</button>
+</div>
+
+<!-- ========== App shell ========== -->
+<div id="app-shell" class="app-shell hidden">
+
+  <aside class="sidebar">
+    <div class="wordmark">AXIS <span>OS</span></div>
+    <nav class="side-nav">
+      <button class="nav-item active" data-page="dashboard">Dashboard</button>
+      <button class="nav-item" data-page="analytics">Analytics</button>
+      <button class="nav-item" data-page="financial">Financial</button>
+      <button class="nav-item" data-page="trip">Trip</button>
+      <button class="nav-item" data-page="goals">Goals</button>
+      <button class="nav-item" data-page="daily">Daily</button>
+      <button class="nav-item" data-page="templates">Templates</button>
+      <button class="nav-item" data-page="settings">Settings</button>
+      <button class="nav-item" data-page="privacy">Privacy Policy</button>
+      <button class="nav-item" data-page="faq">FAQ</button>
+    </nav>
+    <button type="button" id="logout-btn" class="logout-btn">Log out</button>
+  </aside>
+
+  <main class="main-area">
+    <header class="mobile-topbar">
+      <div class="wordmark">AXIS <span>OS</span></div>
+    </header>
+
+    <div class="page-content">
+
+      <section data-page="dashboard" class="page">
+        <p class="status-line"><span class="dot"></span>v1.0 — running</p>
+        <h1>Welcome back.</h1>
+        <p class="sub">Here's where things stand today.</p>
+        <div id="dashboard-summary" class="modules-list"></div>
+      </section>
+
+      <section data-page="analytics" class="page hidden">
+        <h1>Analytics</h1>
+        <p class="placeholder-note">Trends across Daily, Financial, Trip, and Goals — coming next. For now, check the summary on your Dashboard and Daily tabs.</p>
+      </section>
+
+      <section data-page="financial" class="page hidden">
+        <h1>Financial</h1>
+        <p class="placeholder-note">Track spending, savings goals, and budgets here — coming soon.</p>
+      </section>
+
+      <section data-page="trip" class="page hidden">
+        <h1>Trip</h1>
+        <p class="placeholder-note">Plan and track upcoming trips here — coming soon.</p>
+      </section>
+
+      <section data-page="goals" class="page hidden">
+        <h1>Goals</h1>
+        <p class="placeholder-note">Longer-term targets that aren't daily habits — coming soon.</p>
+      </section>
+
+      <section data-page="daily" class="page hidden">
+        <h1>Daily</h1>
+        <p class="sub">What you're tracking today.</p>
+        <div id="daily-analytics" class="daily-analytics"></div>
+        <div id="daily-list" class="module"></div>
+      </section>
+
+      <section data-page="templates" class="page hidden">
+        <h1>Templates</h1>
+        <p class="placeholder-note">Ready-made habit and tracking sets you can drop in with one tap — coming soon.</p>
+      </section>
+
+      <section data-page="settings" class="page hidden">
+        <h1>Settings</h1>
+        <p class="placeholder-note">Account, plan, and notification preferences — coming soon.</p>
+      </section>
+
+      <section data-page="privacy" class="page hidden">
+        <h1>Privacy Policy</h1>
+        <p class="placeholder-note">Your privacy policy text goes here once drafted.</p>
+      </section>
+
+      <section data-page="faq" class="page hidden">
+        <h1>FAQ</h1>
+        <p class="placeholder-note">Common questions and answers go here.</p>
+      </section>
+
+    </div>
+  </main>
+
+  <aside id="ad-rail" class="ad-rail hidden">
+    <div class="ad-slot">
+      <p class="ad-label">Sponsored</p>
+      <p class="ad-placeholder-text">Ad space — shown to free-plan users when online.</p>
+    </div>
+  </aside>
+
+  <nav class="bottom-nav">
+    <button class="bottom-nav-item active" data-page="dashboard">Dashboard</button>
+    <button class="bottom-nav-item" data-page="daily">Daily</button>
+    <button type="button" id="more-btn" class="bottom-nav-item">&#8942;<span class="bottom-nav-label">More</span></button>
+  </nav>
+
+  <div id="more-sheet" class="more-sheet hidden">
+    <button class="more-item" data-page="analytics">Analytics</button>
+    <button class="more-item" data-page="financial">Financial</button>
+    <button class="more-item" data-page="trip">Trip</button>
+    <button class="more-item" data-page="goals">Goals</button>
+    <button class="more-item" data-page="templates">Templates</button>
+    <button class="more-item" data-page="settings">Settings</button>
+    <button class="more-item" data-page="privacy">Privacy Policy</button>
+    <button class="more-item" data-page="faq">FAQ</button>
+    <button class="more-item logout" id="more-logout">Log out</button>
+  </div>
+
+</div>
+
+<template id="habit-row-template">
+  <div class="habit-row">
+    <button type="button" class="habit-check"></button>
+    <span class="habit-name"></span>
+    <span class="habit-streak"></span>
+    <button type="button" class="habit-remove" aria-label="Remove habit">&times;</button>
+  </div>
+</template>
+
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
