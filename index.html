@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Axis — your four systems</title>
+<meta name="description" content="A life OS that tracks what matters across physical, mental, social, and spiritual growth.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="wrap">
+  <header class="top-row">
+    <div class="wordmark">AXIS <span>OS</span></div>
+    <div class="plan-pill">free plan</div>
+  </header>
+
+  <p class="status-line"><span class="dot"></span>v1.0 — running</p>
+
+  <h1>Four systems.<br>One dashboard.</h1>
+  <p class="sub">No blank page to fill in. Add what you're tracking once — Axis takes it from there.</p>
+
+  <div id="modules" class="modules-list"></div>
+
+  <div class="prompt-row">&gt; ask your coach anything<span class="caret">_</span></div>
+  <p class="prompt-note">Coming in Week 4 — the AI agent will read this dashboard and coach from it.</p>
+</div>
+
+<template id="habit-row-template">
+  <div class="habit-row">
+    <button type="button" class="habit-check"></button>
+    <span class="habit-name"></span>
+    <span class="habit-streak"></span>
+    <button type="button" class="habit-remove" aria-label="Remove habit">&times;</button>
+  </div>
+</template>
+
+<script src="app.js"></script>
+</body>
+</html>
