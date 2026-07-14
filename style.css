@@ -586,3 +586,21 @@ h1 {
 
   .more-item.logout { color: var(--physical); }
 }
+
+.install-btn {
+  position: absolute;
+  top: 1.5rem;
+  right: 1.25rem;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.8rem;
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.install-btn:hover { border-color: var(--gold, var(--mental)); }
+
+.sidebar { position: sticky; }
