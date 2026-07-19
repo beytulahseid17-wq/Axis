@@ -1,7 +1,7 @@
 (function () {
   "use strict";
 
-  var supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  var supabaseClient = window.supabase.createClient(https://jcfqjltjnkocjmctnsth.supabase.co, sb_publishable_jpwzeaA48qFcOIQEVu1zSg_mEv2Br-8);
 
   var state = {
     session: null,
