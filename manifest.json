@@ -1,7 +1,7 @@
 {
   "name": "Axis OS",
   "short_name": "Axis",
-  "description": "A life OS: daily habits, financial tracking, trips, and goals in one dashboard.",
+  "description": "Life Planner: daily habits, financial tracking, trips, and goals in one dashboard.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
