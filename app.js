@@ -1,7 +1,27 @@
 (function () {
   "use strict";
 
-  var supabaseClient = window.supabase.createClient("https://jcfqjltjnkocjmctnsth.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZnFqbHRqbmtvY2ptY3Ruc3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMTUwNTEsImV4cCI6MjA5OTU5MTA1MX0.t2U8GsWpm8J3HMj6nmFIwv5RA2dhaRrLo8YdcMnVP7M");
+  var supabaseClient = null;
+  try {
+    supabaseClient = window.supabase.createClient("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZnFqbHRqbmtvY2ptY3Ruc3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMTUwNTEsImV4cCI6MjA5OTU5MTA1MX0.t2U8GsWpm8J3HMj6nmFIwv5RA2dhaRrLo8YdcMnVP7M");
+  } catch (e) {
+    console.error("Axis: failed to create Supabase client — check config.js", e);
+  }
+
+  if (!supabaseClient) {
+    document.addEventListener("DOMContentLoaded", function () {
+      var authScreen = document.getElementById("auth-screen");
+      if (authScreen) {
+        authScreen.innerHTML =
+          '<div class="wordmark" style="margin-bottom:1rem;">Axis <span>Planner</span></div>' +
+          '<p style="color:#E85A4C;font-size:0.9rem;line-height:1.6;">' +
+          'Setup issue: config.js is missing a valid SUPABASE_URL / SUPABASE_ANON_KEY. ' +
+          'Open config.js and paste in your real Project URL and key from Supabase → Settings → API, then reload.' +
+          '</p>';
+      }
+    });
+    return;
+  }
 
   var state = {
     session: null,
@@ -191,6 +211,11 @@
     var badge = document.getElementById("notif-badge");
     badge.textContent = remaining;
     badge.classList.toggle("hidden", remaining === 0);
+    var mobileBadge = document.getElementById("mobile-notif-badge");
+    if (mobileBadge) {
+      mobileBadge.textContent = remaining;
+      mobileBadge.classList.toggle("hidden", remaining === 0);
+    }
 
     var emailEl = document.getElementById("dash-user-email");
     if (emailEl) emailEl.textContent = "Back out, " + (state.session ? state.session.user.email : "");
@@ -433,7 +458,7 @@
       var barHeight = (d.pct / 100) * (height - padding * 2);
       var x = i * (barWidth + gap);
       var y = height - padding - barHeight;
-      return '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + Math.max(barHeight, 2) + '" rx="6" fill="#32CD32" opacity="0.8"/>' +
+      return '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + Math.max(barHeight, 2) + '" rx="6" fill="#4F46E5" opacity="0.8"/>' +
         '<text x="' + (x + barWidth / 2) + '" y="' + (height + 12) + '" text-anchor="middle" font-size="10" fill="#64748B" font-family="IBM Plex Mono">' + d.label + '</text>';
     }).join("");
 
@@ -756,8 +781,8 @@
 
     el.innerHTML = '<svg viewBox="0 0 ' + width + ' ' + height + '" class="chart-svg-wrap" preserveAspectRatio="none">' +
       '<line x1="' + padding + '" x2="' + (width - padding) + '" y1="' + (height - padding - ((0 - min) / range) * (height - padding * 2)) + '" y2="' + (height - padding - ((0 - min) / range) * (height - padding * 2)) + '" stroke="#E2E8F0" stroke-dasharray="3 4"/>' +
-      '<path d="' + linePath + '" fill="none" stroke="' + (lastPositive ? "#32CD32" : "#E85A4C") + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
-      coords.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="' + (lastPositive ? "#32CD32" : "#E85A4C") + '"/>'; }).join("") +
+      '<path d="' + linePath + '" fill="none" stroke="' + (lastPositive ? "#4F46E5" : "#E85A4C") + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+      coords.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="' + (lastPositive ? "#4F46E5" : "#E85A4C") + '"/>'; }).join("") +
       '</svg>';
   }
 
