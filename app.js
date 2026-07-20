@@ -127,9 +127,6 @@
     document.querySelectorAll(".bottom-nav-item[data-page]").forEach(function (el) {
       el.classList.toggle("active", el.getAttribute("data-page") === pageId);
     });
-    var isHome = pageId === "home";
-    document.getElementById("side-nav-home").classList.toggle("hidden", !isHome);
-    document.getElementById("side-nav-full").classList.toggle("hidden", isHome);
     window.scrollTo(0, 0);
   }
 
@@ -188,6 +185,8 @@
 
   function renderTopbar() {
     var habits = dailyHabits();
+    var bestStreak = habits.reduce(function (max, h) { return Math.max(max, habitStreak(h.id)); }, 0);
+    document.getElementById("streak-count").textContent = bestStreak;
     var remaining = habits.filter(function (h) { return !isDone(h.id, 0); }).length;
     var badge = document.getElementById("notif-badge");
     badge.textContent = remaining;
@@ -434,15 +433,15 @@
       var barHeight = (d.pct / 100) * (height - padding * 2);
       var x = i * (barWidth + gap);
       var y = height - padding - barHeight;
-      return '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + Math.max(barHeight, 2) + '" rx="6" fill="#2563EB" opacity="0.75"/>' +
+      return '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + Math.max(barHeight, 2) + '" rx="6" fill="#32CD32" opacity="0.8"/>' +
         '<text x="' + (x + barWidth / 2) + '" y="' + (height + 12) + '" text-anchor="middle" font-size="10" fill="#64748B" font-family="IBM Plex Mono">' + d.label + '</text>';
     }).join("");
 
     containerEl.innerHTML =
       '<svg viewBox="0 0 ' + svgWidth + ' ' + (height + 22) + '" class="chart-svg-wrap" preserveAspectRatio="xMinYMid meet">' +
       bars +
-      '<path d="' + linePath + '" fill="none" stroke="#0F172A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-      linePoints.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3.5" fill="#0F172A"/>'; }).join("") +
+      '<path d="' + linePath + '" fill="none" stroke="#23291F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
+      linePoints.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3.5" fill="#23291F"/>'; }).join("") +
       '</svg>';
   }
 
@@ -757,8 +756,8 @@
 
     el.innerHTML = '<svg viewBox="0 0 ' + width + ' ' + height + '" class="chart-svg-wrap" preserveAspectRatio="none">' +
       '<line x1="' + padding + '" x2="' + (width - padding) + '" y1="' + (height - padding - ((0 - min) / range) * (height - padding * 2)) + '" y2="' + (height - padding - ((0 - min) / range) * (height - padding * 2)) + '" stroke="#E2E8F0" stroke-dasharray="3 4"/>' +
-      '<path d="' + linePath + '" fill="none" stroke="' + (lastPositive ? "#2563EB" : "#EF4444") + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
-      coords.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="' + (lastPositive ? "#2563EB" : "#EF4444") + '"/>'; }).join("") +
+      '<path d="' + linePath + '" fill="none" stroke="' + (lastPositive ? "#32CD32" : "#E85A4C") + '" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+      coords.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3" fill="' + (lastPositive ? "#32CD32" : "#E85A4C") + '"/>'; }).join("") +
       '</svg>';
   }
 
