@@ -3,7 +3,7 @@
 
   var supabaseClient = null;
   try {
-    supabaseClient = window.supabase.createClient("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZnFqbHRqbmtvY2ptY3Ruc3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMTUwNTEsImV4cCI6MjA5OTU5MTA1MX0.t2U8GsWpm8J3HMj6nmFIwv5RA2dhaRrLo8YdcMnVP7M");
+    supabaseClient = window.supabase.createClient("https://jcfqjltjnkocjmctnsth.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZnFqbHRqbmtvY2ptY3Ruc3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMTUwNTEsImV4cCI6MjA5OTU5MTA1MX0.t2U8GsWpm8J3HMj6nmFIwv5RA2dhaRrLo8YdcMnVP7M");
   } catch (e) {
     console.error("Axis: failed to create Supabase client — check config.js", e);
   }
