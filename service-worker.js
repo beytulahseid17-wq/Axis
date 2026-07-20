@@ -1,4 +1,4 @@
-var CACHE_NAME = "axis-cache-v1";
+var CACHE_NAME = "axis-cache-v2";
 var CACHE_FILES = [
   "./", "./index.html", "./style.css", "./app.js", "./config.js",
   "./manifest.json", "./icon-192.png", "./icon-512.png"
@@ -20,23 +20,26 @@ self.addEventListener("activate", function (event) {
   self.clients.claim();
 });
 
+// Network-first for our own app files, so updates show up immediately without
+// a hard refresh. Falls back to cache only when offline. Supabase calls always
+// go straight to network — never cached.
 self.addEventListener("fetch", function (event) {
   if (event.request.method !== "GET") return;
-  // Never cache Supabase API calls — always go to network for live data.
   if (event.request.url.indexOf("supabase.co") !== -1) return;
 
   event.respondWith(
-    caches.match(event.request).then(function (cached) {
-      if (cached) return cached;
-      return fetch(event.request)
-        .then(function (response) {
-          if (response && response.ok) {
-            var clone = response.clone();
-            caches.open(CACHE_NAME).then(function (cache) { cache.put(event.request, clone); });
-          }
-          return response;
-        })
-        .catch(function () { return caches.match("./index.html"); });
-    })
+    fetch(event.request)
+      .then(function (response) {
+        if (response && response.ok) {
+          var clone = response.clone();
+          caches.open(CACHE_NAME).then(function (cache) { cache.put(event.request, clone); });
+        }
+        return response;
+      })
+      .catch(function () {
+        return caches.match(event.request).then(function (cached) {
+          return cached || caches.match("./index.html");
+        });
+      })
   );
 });
