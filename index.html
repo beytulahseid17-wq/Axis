@@ -42,6 +42,14 @@
       <div class="wordmark" data-page-link="home" style="cursor:pointer;">Axis <span>Planner</span></div>
     </div>
     <div class="topbar-icons">
+      <div class="topbar-stat" title="Current streak">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+        <span id="streak-count">0</span>
+      </div>
+      <div class="topbar-stat" title="Coins">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 9.5a2.5 2.5 0 0 1 2.5-1.5h1a2 2 0 0 1 0 4h-1a2 2 0 0 0 0 4h1a2.5 2.5 0 0 0 2.5-1.5"/></svg>
+        <span id="coin-count">0</span>
+      </div>
       <button type="button" id="theme-toggle-btn" aria-label="Toggle theme">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
       </button>
@@ -62,27 +70,16 @@
 
     <aside class="sidebar">
       <button type="button" id="install-btn" class="install-btn hidden" style="margin-bottom:0.75rem;">Install app</button>
-      <div class="coin-pill"><span id="coin-count">0</span> coins</div>
-      <nav class="side-nav" id="side-nav-home">
+      <nav class="side-nav" id="side-nav-full">
         <button class="nav-item active" data-page="home"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Home</button>
         <button class="nav-item" data-page="dashboard"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</button>
         <button class="nav-item" data-page="analytics"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/></svg>Analytics</button>
-        <button class="nav-item" data-page="templates"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Template</button>
-        <button class="nav-item" data-page="settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Setting</button>
-      </nav>
-
-      <nav class="side-nav hidden" id="side-nav-full">
-        <button class="nav-item" data-page="dashboard"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</button>
-        <button class="nav-item" data-page="analytics"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/></svg>Analytics</button>
-        <button class="nav-item" data-page="templates"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Templates</button>
-        <button class="nav-item" data-page="settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
-        <button class="nav-item" data-page="privacy"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>Privacy Policy</button>
-        <button class="nav-item" data-page="terms"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>Terms &amp; Conditions</button>
-        <button class="nav-item" data-page="faq"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 2-3 4"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>FAQ</button>
         <button class="nav-item" data-page="financial"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12V7H5a2 2 0 0 1 0-4h14v4"/><path d="M3 5v14a2 2 0 0 0 2 2h16v-5"/><path d="M18 12a2 2 0 0 0 0 4h4v-4z"/></svg>Financial</button>
         <button class="nav-item" data-page="trip"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Trip Plan</button>
-        <button class="nav-item" data-page="daily"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><path d="M9 14l2 2 4-4"/></svg>Daily</button>
         <button class="nav-item" data-page="goals"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>Goal</button>
+        <button class="nav-item" data-page="daily"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><path d="M9 14l2 2 4-4"/></svg>Daily</button>
+        <button class="nav-item" data-page="templates"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Templates</button>
+        <button class="nav-item" data-page="settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>Settings</button>
       </nav>
       <button type="button" id="logout-btn" class="logout-btn"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Log out</button>
     </aside>
@@ -245,39 +242,36 @@
             <p class="placeholder-note">Premium removes ads and unlocks unlimited AI coaching. Payments aren't wired up yet — this button is a placeholder link.</p>
             <a href="#" id="upgrade-link" class="calc-btn upgrade-link">Upgrade to Premium</a>
           </div>
-        </section>
 
-        <!-- ---------- Privacy Policy ---------- -->
-        <section data-page="privacy" class="page hidden">
-          <h1>Privacy Policy</h1>
-          <div class="prose">
-            <p>Axis stores the data you enter — habits, check-ins, financial figures, trips, and goals — in your own account, in a database only you can access. Row-level security rules mean no other user can ever read or write your data.</p>
-            <p>Your email and password are handled by Supabase Authentication and are never stored in plain text. Financial figures you enter are for your own tracking only — Axis does not connect to real bank accounts or move money.</p>
-            <p>If you use the AI coach, the messages you send and your recent habit data are sent to the AI provider (currently Google Gemini) to generate a response. This is used only to produce your reply.</p>
-            <p>You can delete your account and all associated data at any time from Settings.</p>
-          </div>
-        </section>
+          <details class="module settings-details" style="margin-top:1rem;">
+            <summary class="module-title">Privacy Policy</summary>
+            <div class="prose">
+              <p>Axis stores the data you enter — habits, check-ins, financial figures, trips, and goals — in your own account, in a database only you can access. Row-level security rules mean no other user can ever read or write your data.</p>
+              <p>Your email and password are handled by Supabase Authentication and are never stored in plain text. Financial figures you enter are for your own tracking only — Axis does not connect to real bank accounts or move money.</p>
+              <p>If you use the AI coach, the messages you send and your recent habit data are sent to the AI provider (currently Google Gemini) to generate a response. This is used only to produce your reply.</p>
+              <p>You can delete your account and all associated data at any time from Settings.</p>
+            </div>
+          </details>
 
-        <!-- ---------- Terms & Conditions ---------- -->
-        <section data-page="terms" class="page hidden">
-          <h1>Terms &amp; Conditions</h1>
-          <div class="prose">
-            <p>Axis is provided as-is, without warranty of any kind. Financial figures, goals, and trip plans you enter are for personal organization only and do not constitute financial or travel advice.</p>
-            <p>You're responsible for the accuracy of the data you enter. Axis does not verify balances, transactions, or goal figures against any external source.</p>
-            <p>The AI coach's suggestions are generated by a third-party AI model and may be inaccurate — use your own judgment, especially for anything financial or health-related.</p>
-            <p>Continued use of Axis means you accept these terms as they're updated over time.</p>
-          </div>
-        </section>
+          <details class="module settings-details" style="margin-top:1rem;">
+            <summary class="module-title">Terms &amp; Conditions</summary>
+            <div class="prose">
+              <p>Axis is provided as-is, without warranty of any kind. Financial figures, goals, and trip plans you enter are for personal organization only and do not constitute financial or travel advice.</p>
+              <p>You're responsible for the accuracy of the data you enter. Axis does not verify balances, transactions, or goal figures against any external source.</p>
+              <p>The AI coach's suggestions are generated by a third-party AI model and may be inaccurate — use your own judgment, especially for anything financial or health-related.</p>
+              <p>Continued use of Axis means you accept these terms as they're updated over time.</p>
+            </div>
+          </details>
 
-        <!-- ---------- FAQ ---------- -->
-        <section data-page="faq" class="page hidden">
-          <h1>FAQ</h1>
-          <div class="prose">
-            <p><strong>Is my data private?</strong><br>Yes — each account's data is isolated at the database level, enforced by row-level security.</p>
-            <p><strong>Does Axis connect to my real bank account?</strong><br>No. The Financial tab is a manual tracker — you enter your own numbers.</p>
-            <p><strong>What happens if I go offline?</strong><br>Axis is installable as an app and caches itself for offline use.</p>
-            <p><strong>Can I remove ads?</strong><br>Yes — ads only show on the free plan. Upgrading to Premium removes them.</p>
-          </div>
+          <details class="module settings-details" style="margin-top:1rem;">
+            <summary class="module-title">FAQ</summary>
+            <div class="prose">
+              <p><strong>Is my data private?</strong><br>Yes — each account's data is isolated at the database level, enforced by row-level security.</p>
+              <p><strong>Does Axis connect to my real bank account?</strong><br>No. The Financial tab is a manual tracker — you enter your own numbers.</p>
+              <p><strong>What happens if I go offline?</strong><br>Axis is installable as an app and caches itself for offline use.</p>
+              <p><strong>Can I remove ads?</strong><br>Yes — ads only show on the free plan. Upgrading to Premium removes them.</p>
+            </div>
+          </details>
         </section>
 
       </div>
@@ -373,7 +367,7 @@
   </div>
 </template>
 
-<script src="config.js?v=1.02"></script>
-<script src="app.js?v=1.02"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
