@@ -28,6 +28,7 @@
     plan: "free",
     displayName: "",
     coins: 0,
+    journeyMilestoneClaimed: 0,
     habits: [],
     entriesByHabit: {},
     financial: { income: 0, outcome: 0 },
@@ -228,7 +229,7 @@
     var since = dateStr(60);
 
     var calls = [
-      supabaseClient.from("profiles").select("plan, display_name, coins").eq("id", userId).single(),
+      supabaseClient.from("profiles").select("plan, display_name, coins, journey_milestone_claimed").eq("id", userId).single(),
       supabaseClient.from("habits").select("*").eq("user_id", userId).eq("is_active", true).order("created_at"),
       supabaseClient.from("habit_entries").select("habit_id, entry_date").eq("user_id", userId).gte("entry_date", since),
       supabaseClient.from("financial_state").select("*").eq("user_id", userId).maybeSingle(),
@@ -245,6 +246,7 @@
         state.plan = profileRes.data.plan || "free";
         state.displayName = profileRes.data.display_name || "";
         state.coins = profileRes.data.coins || 0;
+        state.journeyMilestoneClaimed = profileRes.data.journey_milestone_claimed || 0;
       }
       if (habitsRes.error) console.error("Axis: habits fetch failed", habitsRes.error);
       state.habits = habitsRes.data || [];
@@ -895,6 +897,129 @@
 
   // ==================== ANALYTICS ====================
 
+  // ==================== JOURNEY PATH ====================
+
+  function dayCompletionPct(offset) {
+    var habits = dailyHabits();
+    if (habits.length === 0) return 0;
+    var doneCount = habits.filter(function (h) { return isDone(h.id, offset); }).length;
+    return (doneCount / habits.length) * 100;
+  }
+
+  function journeyStreak() {
+    var offset = dayCompletionPct(0) >= 75 ? 0 : 1;
+    if (offset === 1 && dayCompletionPct(1) < 75) return 0;
+    var streak = 0;
+    while (dayCompletionPct(offset) >= 75) { streak++; offset++; }
+    return streak;
+  }
+
+  function showConfetti() {
+    var layer = document.getElementById("confetti-layer");
+    var colors = ["#4F46E5", "#FF6B4A", "#F59E0B", "#22C55E", "#818CF8"];
+    for (var i = 0; i < 36; i++) {
+      var piece = document.createElement("div");
+      piece.className = "confetti-piece";
+      piece.style.left = Math.random() * 100 + "vw";
+      piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+      piece.style.animationDuration = (2 + Math.random() * 1.5) + "s";
+      piece.style.animationDelay = (Math.random() * 0.4) + "s";
+      layer.appendChild(piece);
+      (function (el) { setTimeout(function () { el.remove(); }, 4200); })(piece);
+    }
+  }
+
+  function showJourneyToast(title, sub) {
+    var toast = document.getElementById("journey-toast");
+    document.getElementById("journey-toast-title").textContent = title;
+    document.getElementById("journey-toast-sub").textContent = sub;
+    toast.classList.remove("hidden");
+    requestAnimationFrame(function () { toast.classList.add("show"); });
+    setTimeout(function () {
+      toast.classList.remove("show");
+      setTimeout(function () { toast.classList.add("hidden"); }, 400);
+    }, 3200);
+  }
+
+  function checkJourneyMilestone() {
+    var streak = journeyStreak();
+    if (streak > 0 && streak % 7 === 0 && streak > state.journeyMilestoneClaimed) {
+      state.journeyMilestoneClaimed = streak;
+      adjustCoins(250);
+      showConfetti();
+      showJourneyToast(streak + "-day streak!", "+250 coins");
+      supabaseClient.from("profiles").update({ journey_milestone_claimed: streak }).eq("id", state.session.user.id)
+        .then(function (res) { if (res.error) console.error("Axis: journey milestone save failed", res.error); });
+      return true;
+    }
+    return false;
+  }
+
+  function renderJourneyPath() {
+    var streak = journeyStreak();
+    document.getElementById("journey-streak-count").textContent = streak;
+
+    var wrap = document.getElementById("journey-path");
+    wrap.innerHTML = "";
+
+    var nodeCount = 9; // 7 days of the current cycle + chest + one upcoming teaser
+    var amplitude = 64;
+
+    for (var i = 0; i < nodeCount; i++) {
+      var isChestSlot = i === 7;
+      var isTeaser = i === 8;
+      var dayIndexInCycle = i; // 0..6 map to streak days 1..7
+
+      var nodeWrap = document.createElement("div");
+      nodeWrap.className = "journey-node-wrap";
+      nodeWrap.style.transform = "translateX(" + Math.round(Math.sin(i * 0.85) * amplitude) + "px)";
+
+      var node = document.createElement("div");
+      node.className = "journey-node";
+      var label = document.createElement("span");
+      label.className = "journey-label";
+
+      if (isTeaser) {
+        node.classList.add("locked");
+        node.textContent = "🔒";
+        label.textContent = "Next up";
+      } else if (isChestSlot) {
+        var claimed = state.journeyMilestoneClaimed >= 7;
+        var claimable = streak >= 7;
+        node.classList.add("chest", claimed ? "claimed" : (claimable ? "claimable" : "locked"));
+        node.textContent = claimed ? "✅" : "🎁";
+        label.textContent = claimed ? "Claimed" : "7-day chest";
+      } else {
+        var dayNum = dayIndexInCycle + 1;
+        if (dayNum <= streak) {
+          node.classList.add("completed");
+          node.textContent = "★";
+        } else if (dayNum === streak + 1) {
+          node.classList.add("current");
+          node.textContent = "●";
+        } else {
+          node.classList.add("locked");
+          node.textContent = "○";
+        }
+        label.textContent = "Day " + dayNum;
+      }
+
+      nodeWrap.appendChild(node);
+      nodeWrap.appendChild(label);
+
+      if (dayIndexInCycle === Math.min(streak, 6) && !isChestSlot && !isTeaser) {
+        var mascot = document.createElement("span");
+        mascot.className = "journey-mascot";
+        mascot.textContent = "🦉";
+        nodeWrap.appendChild(mascot);
+      }
+
+      wrap.appendChild(nodeWrap);
+    }
+
+    checkJourneyMilestone();
+  }
+
   function renderAnalytics() {
     var habits = dailyHabits();
     var totalGoals = state.financialGoals.length + state.generalGoals.length;
@@ -905,6 +1030,7 @@
       statCard(state.trips.length, "Trips");
 
     renderComboChart(document.getElementById("analytics-chart"), completionSeries(7));
+    renderJourneyPath();
   }
 
   // ==================== SETTINGS ====================
