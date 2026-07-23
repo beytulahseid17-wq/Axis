@@ -186,6 +186,19 @@
   }
 
   window.addEventListener("online", updateAdRail);
+
+  var resizeTimer = null;
+  var lastChartDayCount = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(function () {
+      var current = chartDayCount();
+      if (current !== lastChartDayCount) {
+        lastChartDayCount = current;
+        if (state.session) renderAnalytics();
+      }
+    }, 200);
+  });
   window.addEventListener("offline", updateAdRail);
 
   // ==================== COINS ====================
@@ -440,17 +453,36 @@
     for (var i = days - 1; i >= 0; i--) {
       var doneCount = habits.filter(function (h) { return isDone(h.id, i); }).length;
       var pct = habits.length ? (doneCount / habits.length) * 100 : 0;
-      var d = new Date(); d.setDate(d.getDate() - i);
-      series.push({ label: d.toLocaleDateString(undefined, { weekday: "short" }), pct: pct });
+      series.push({ label: "D" + (days - i), pct: pct });
     }
     return series;
   }
 
+  function chartDayCount() {
+    return window.innerWidth >= 768 ? 19 : 7;
+  }
+
   function renderComboChart(containerEl, series) {
-    var barWidth = 34, gap = 12, height = 130, padding = 16;
-    var svgWidth = series.length * (barWidth + gap);
+    var count = series.length;
+    var compact = count > 10;
+    var barWidth = compact ? 14 : 26;
+    var gap = compact ? 5 : 10;
+    var height = 90;
+    var padding = 12;
+    var leftPad = 26;
+
+    var plotWidth = count * (barWidth + gap);
+    var svgWidth = plotWidth + leftPad;
+
+    var yTicks = [0, 25, 50, 75, 100];
+    var gridLines = yTicks.map(function (t) {
+      var y = height - padding - (t / 100) * (height - padding * 2);
+      return '<line x1="' + leftPad + '" x2="' + svgWidth + '" y1="' + y + '" y2="' + y + '" stroke="#E8E1D3" stroke-width="1"/>' +
+        '<text x="' + (leftPad - 6) + '" y="' + (y + 3) + '" text-anchor="end" font-size="8" fill="#8A8070" font-family="IBM Plex Mono">' + t + '%</text>';
+    }).join("");
+
     var linePoints = series.map(function (d, i) {
-      var x = i * (barWidth + gap) + barWidth / 2;
+      var x = leftPad + i * (barWidth + gap) + barWidth / 2;
       var y = height - padding - (d.pct / 100) * (height - padding * 2);
       return [x, y];
     });
@@ -458,17 +490,18 @@
 
     var bars = series.map(function (d, i) {
       var barHeight = (d.pct / 100) * (height - padding * 2);
-      var x = i * (barWidth + gap);
+      var x = leftPad + i * (barWidth + gap);
       var y = height - padding - barHeight;
-      return '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + Math.max(barHeight, 2) + '" rx="6" fill="#4F46E5" opacity="0.8"/>' +
-        '<text x="' + (x + barWidth / 2) + '" y="' + (height + 12) + '" text-anchor="middle" font-size="10" fill="#64748B" font-family="IBM Plex Mono">' + d.label + '</text>';
+      var showLabel = !compact || i % 3 === 0 || i === count - 1;
+      return '<rect x="' + x + '" y="' + y + '" width="' + barWidth + '" height="' + Math.max(barHeight, 2) + '" rx="4" fill="#4F46E5" opacity="0.8"/>' +
+        (showLabel ? '<text x="' + (x + barWidth / 2) + '" y="' + (height + 12) + '" text-anchor="middle" font-size="' + (compact ? 6.5 : 9) + '" fill="#8A8070" font-family="IBM Plex Mono">' + d.label + '</text>' : "");
     }).join("");
 
     containerEl.innerHTML =
-      '<svg viewBox="0 0 ' + svgWidth + ' ' + (height + 22) + '" class="chart-svg-wrap" preserveAspectRatio="xMinYMid meet">' +
-      bars +
-      '<path d="' + linePath + '" fill="none" stroke="#23291F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>' +
-      linePoints.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="3.5" fill="#23291F"/>'; }).join("") +
+      '<svg viewBox="0 0 ' + svgWidth + ' ' + (height + 20) + '" class="chart-svg-wrap" preserveAspectRatio="xMinYMid meet">' +
+      gridLines + bars +
+      '<path d="' + linePath + '" fill="none" stroke="#23291F" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"/>' +
+      linePoints.map(function (p) { return '<circle cx="' + p[0] + '" cy="' + p[1] + '" r="2.5" fill="#23291F"/>'; }).join("") +
       '</svg>';
   }
 
@@ -1029,7 +1062,7 @@
       statCard(totalGoals, "Goals") +
       statCard(state.trips.length, "Trips");
 
-    renderComboChart(document.getElementById("analytics-chart"), completionSeries(7));
+    renderComboChart(document.getElementById("analytics-chart"), completionSeries(chartDayCount()));
     renderJourneyPath();
   }
 
