@@ -160,6 +160,15 @@
             <p class="module-title">Daily completion — last 7 days</p>
             <div id="analytics-chart"></div>
           </div>
+
+          <div class="module journey-module">
+            <div class="journey-header">
+              <p class="module-title" style="margin:0;">Your journey</p>
+              <span class="journey-streak-pill">🔥 <span id="journey-streak-count">0</span> day streak</span>
+            </div>
+            <p class="journey-sub">A day counts once you're 75%+ done. Hit a 7-day streak for a 250-coin chest.</p>
+            <div id="journey-path" class="journey-path"></div>
+          </div>
         </section>
 
         <!-- ---------- Financial ---------- -->
@@ -288,6 +297,15 @@
     </aside>
 
   </div>
+
+  <div id="journey-toast" class="journey-toast hidden">
+    <span class="journey-toast-icon">🎉</span>
+    <div>
+      <p class="journey-toast-title" id="journey-toast-title">7-day streak!</p>
+      <p class="journey-toast-sub" id="journey-toast-sub">+250 coins</p>
+    </div>
+  </div>
+  <div id="confetti-layer" class="confetti-layer"></div>
 
   <button type="button" id="coach-toggle" class="coach-toggle">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
