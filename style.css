@@ -886,7 +886,7 @@ h1, h2, h3 {
   .sidebar { display: none; }
   .ad-rail { display: none; }
 
-  .main-area { padding: 1rem 1rem 6.5rem; }
+  .main-area { padding: 1rem 1rem 7.5rem; }
 
   .quicklink-grid { grid-template-columns: repeat(2, 1fr); }
 
@@ -897,20 +897,20 @@ h1, h2, h3 {
     display: flex;
     justify-content: center;
     position: fixed;
-    bottom: 0.9rem;
-    left: 0.75rem;
-    right: 0.75rem;
+    bottom: 1.1rem;
+    left: 0.6rem;
+    right: 0.6rem;
     z-index: 30;
   }
 
   .bottom-nav-pill {
     display: flex;
     align-items: center;
-    gap: 0.2rem;
+    gap: 0.3rem;
     background: var(--surface);
     border-radius: 999px;
-    padding: 0.4rem;
-    box-shadow: 0 8px 24px rgba(30, 27, 46, 0.18);
+    padding: 0.55rem;
+    box-shadow: 0 10px 28px rgba(30, 27, 46, 0.2);
     max-width: 100%;
     overflow-x: auto;
   }
@@ -918,20 +918,20 @@ h1, h2, h3 {
   .bottom-nav-item {
     display: flex;
     align-items: center;
-    gap: 0.4rem;
+    gap: 0.45rem;
     background: none;
     border: none;
     color: var(--text-muted);
-    font-size: 0.78rem;
+    font-size: 0.86rem;
     font-weight: 600;
-    padding: 0.55rem 0.75rem;
+    padding: 0.75rem 1rem;
     border-radius: 999px;
     cursor: pointer;
     white-space: nowrap;
     position: relative;
   }
 
-  .bottom-nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+  .bottom-nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
 
   .bottom-nav-item span:not(.bottom-nav-badge) { display: none; }
 
