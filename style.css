@@ -983,3 +983,204 @@ h1, h2, h3 {
 .settings-details[open] summary::after { content: "\2212"; }
 
 .settings-details .prose { margin-top: 0.9rem; }
+
+/* ============ Journey path (Analytics) ============ */
+
+.journey-module { overflow: hidden; }
+
+.journey-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.journey-streak-pill {
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent);
+  padding: 0.3rem 0.7rem;
+  border-radius: 999px;
+}
+
+.journey-sub {
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin: 0.5rem 0 0;
+}
+
+.journey-path {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2.25rem;
+  padding: 2.25rem 0 1rem;
+  max-width: 320px;
+  margin: 0 auto;
+}
+
+.journey-node-wrap {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.3s ease;
+}
+
+.journey-node {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  box-shadow: 0 4px 0 rgba(0,0,0,0.15), 0 6px 14px rgba(0,0,0,0.08);
+  font-size: 1.5rem;
+  border: none;
+  cursor: default;
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+.journey-node.locked { opacity: 0.55; box-shadow: 0 3px 0 rgba(0,0,0,0.08); }
+
+.journey-node.completed {
+  background: linear-gradient(180deg, #4ADE80, #22C55E);
+  color: #fff;
+  box-shadow: 0 4px 0 #16A34A, 0 6px 14px rgba(34, 197, 94, 0.35);
+  animation: node-pop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.journey-node.current {
+  background: linear-gradient(180deg, var(--accent), #3730A3);
+  color: #fff;
+  box-shadow: 0 4px 0 #312E81, 0 6px 16px rgba(79, 70, 229, 0.4);
+  animation: node-bounce 1.8s ease-in-out infinite;
+}
+
+.journey-node.current::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  opacity: 0.5;
+  animation: ring-pulse 1.8s ease-out infinite;
+}
+
+.journey-node.chest {
+  background: linear-gradient(180deg, #FCD34D, #F59E0B);
+  color: #fff;
+  box-shadow: 0 4px 0 #B45309, 0 6px 14px rgba(245, 158, 11, 0.4);
+}
+
+.journey-node.chest.claimable {
+  animation: node-bounce 1.4s ease-in-out infinite;
+}
+
+.journey-node.chest.claimed {
+  background: linear-gradient(180deg, #E5E0D0, #D6CFB8);
+  color: #A89F87;
+  box-shadow: 0 4px 0 #B8AF95;
+  animation: none;
+}
+
+.journey-label {
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  margin-top: 0.4rem;
+  font-family: var(--font-mono);
+  text-align: center;
+  white-space: nowrap;
+}
+
+.journey-mascot {
+  position: absolute;
+  right: -2.2rem;
+  top: -0.6rem;
+  font-size: 1.8rem;
+  animation: mascot-bob 2.2s ease-in-out infinite;
+}
+
+@keyframes node-pop {
+  0% { transform: scale(0.4); }
+  60% { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+@keyframes node-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes ring-pulse {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  100% { transform: scale(1.35); opacity: 0; }
+}
+
+@keyframes mascot-bob {
+  0%, 100% { transform: translateY(0) rotate(-3deg); }
+  50% { transform: translateY(-5px) rotate(3deg); }
+}
+
+/* ============ Celebration toast ============ */
+
+.journey-toast {
+  position: fixed;
+  top: 1.25rem;
+  left: 50%;
+  transform: translateX(-50%) translateY(-120%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+  padding: 0.9rem 1.2rem;
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  z-index: 60;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.journey-toast.show { transform: translateX(-50%) translateY(0); }
+
+.journey-toast-icon { font-size: 1.6rem; }
+
+.journey-toast-title { margin: 0; font-weight: 700; font-size: 0.9rem; }
+.journey-toast-sub { margin: 0; color: var(--gold); font-weight: 700; font-size: 0.85rem; font-family: var(--font-mono); }
+
+/* ============ Confetti ============ */
+
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 55;
+  overflow: hidden;
+}
+
+.confetti-piece {
+  position: absolute;
+  top: -10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  animation: confetti-fall linear forwards;
+}
+
+@keyframes confetti-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(540deg); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journey-node.current, .journey-node.chest.claimable, .journey-node.completed,
+  .journey-node.current::after, .journey-mascot, .confetti-piece {
+    animation: none !important;
+  }
+}
