@@ -34,6 +34,11 @@
 <!-- ========== App shell ========== -->
 <div id="app-shell" class="app-shell hidden">
 
+  <button type="button" id="profile-fab" class="profile-fab" data-page-link="profile" aria-label="Profile">
+    <span id="profile-fab-initial">A</span>
+  </button>
+
+
   <div class="shell-body">
 
     <aside class="sidebar">
@@ -160,7 +165,7 @@
             <p class="module-title">Daily completion — last 7 days</p>
             <div id="analytics-chart"></div>
           </div>
-<br>
+
           <div class="module journey-module">
             <div class="journey-header">
               <p class="module-title" style="margin:0;">Your journey</p>
@@ -232,6 +237,41 @@
         </section>
 
         <!-- ---------- Settings ---------- -->
+        <section data-page="profile" class="page hidden">
+          <div class="profile-cover">
+            <img class="profile-cover-img" src="https://images.unsplash.com/photo-1506744038136-46273834b3fb?q=80&w=1400&auto=format&fit=crop" alt="">
+            <div class="profile-avatar-ring">
+              <div class="profile-avatar" id="profile-page-avatar">A</div>
+            </div>
+          </div>
+
+          <div class="profile-body">
+            <h1 id="profile-name">Your name</h1>
+            <p class="profile-email" id="profile-email">you@example.com</p>
+            <span class="profile-plan-pill" id="profile-plan-pill">Free plan</span>
+
+            <div class="profile-stats-row">
+              <div class="profile-stat">
+                <span class="profile-stat-value" id="profile-streak-value">0</span>
+                <span class="profile-stat-label">Day streak</span>
+              </div>
+              <div class="profile-stat">
+                <span class="profile-stat-value" id="profile-coins-value">0</span>
+                <span class="profile-stat-label">Coins</span>
+              </div>
+              <div class="profile-stat">
+                <span class="profile-stat-value" id="profile-habits-value">0</span>
+                <span class="profile-stat-label">Habits</span>
+              </div>
+            </div>
+
+            <div class="profile-actions">
+              <button type="button" class="profile-edit-btn" data-page-link="settings">Edit profile</button>
+              <button type="button" class="profile-logout-btn" id="profile-logout-btn">Log out</button>
+            </div>
+          </div>
+        </section>
+
         <section data-page="settings" class="page hidden">
           <h1>Settings</h1>
           <div class="module">
@@ -296,6 +336,16 @@
       </div>
     </aside>
 
+  </div>
+
+  <div id="chest-modal" class="chest-modal hidden">
+    <div class="chest-modal-card">
+      <button type="button" id="chest-modal-close" class="chest-modal-close" aria-label="Close">&times;</button>
+      <video id="chest-video" class="chest-video" src="reward_animation.mp4" playsinline muted></video>
+      <p class="chest-modal-title" id="chest-modal-title">7-day streak!</p>
+      <p class="chest-modal-sub" id="chest-modal-sub">+250 coins</p>
+      <button type="button" id="chest-modal-unmute" class="chest-unmute-btn">🔇 Unmute</button>
+    </div>
   </div>
 
   <div id="journey-toast" class="journey-toast hidden">
