@@ -974,13 +974,47 @@
     }, 3200);
   }
 
+  function openChestModal(title, sub) {
+    var modal = document.getElementById("chest-modal");
+    var video = document.getElementById("chest-video");
+    document.getElementById("chest-modal-title").textContent = title;
+    document.getElementById("chest-modal-sub").textContent = sub;
+    modal.classList.remove("hidden");
+    video.currentTime = 0;
+    video.muted = true;
+    document.getElementById("chest-modal-unmute").textContent = "🔇 Unmute";
+    video.play().catch(function () { /* autoplay might be blocked — video still visible, user can tap play */ });
+  }
+
+  function closeChestModal() {
+    var modal = document.getElementById("chest-modal");
+    var video = document.getElementById("chest-video");
+    video.pause();
+    modal.classList.add("hidden");
+  }
+
+  function initChestModal() {
+    document.getElementById("chest-modal-close").addEventListener("click", closeChestModal);
+    document.getElementById("chest-modal").addEventListener("click", function (e) {
+      if (e.target.id === "chest-modal") closeChestModal();
+    });
+    document.getElementById("chest-modal-unmute").addEventListener("click", function () {
+      var video = document.getElementById("chest-video");
+      video.muted = !video.muted;
+      this.textContent = video.muted ? "🔇 Unmute" : "🔊 Mute";
+    });
+    document.getElementById("chest-video").addEventListener("ended", function () {
+      setTimeout(closeChestModal, 600);
+    });
+  }
+
   function checkJourneyMilestone() {
     var streak = journeyStreak();
     if (streak > 0 && streak % 7 === 0 && streak > state.journeyMilestoneClaimed) {
       state.journeyMilestoneClaimed = streak;
       adjustCoins(250);
       showConfetti();
-      showJourneyToast(streak + "-day streak!", "+250 coins");
+      openChestModal(streak + "-day streak!", "+250 coins");
       supabaseClient.from("profiles").update({ journey_milestone_claimed: streak }).eq("id", state.session.user.id)
         .then(function (res) { if (res.error) console.error("Axis: journey milestone save failed", res.error); });
       return true;
@@ -1187,6 +1221,7 @@
     initDashboardToggle();
     initSettings();
     initCoach();
+    initChestModal();
 
     supabaseClient.auth.onAuthStateChange(function (event, session) {
       state.session = session;
