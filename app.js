@@ -1175,6 +1175,27 @@
 
   // ==================== RENDER ALL ====================
 
+  function renderProfile() {
+    var initial = (state.displayName || (state.session && state.session.user.email) || "A").charAt(0).toUpperCase();
+    document.getElementById("profile-fab-initial").textContent = initial;
+    document.getElementById("profile-page-avatar").textContent = initial;
+    document.getElementById("profile-name").textContent = state.displayName || "Your name";
+    document.getElementById("profile-email").textContent = state.session ? state.session.user.email : "";
+    document.getElementById("profile-plan-pill").textContent = state.plan === "premium" ? "Premium plan" : "Free plan";
+
+    var habits = dailyHabits();
+    var bestStreak = habits.reduce(function (max, h) { return Math.max(max, habitStreak(h.id)); }, 0);
+    document.getElementById("profile-streak-value").textContent = bestStreak;
+    document.getElementById("profile-coins-value").textContent = state.coins;
+    document.getElementById("profile-habits-value").textContent = habits.length;
+  }
+
+  function initProfile() {
+    document.getElementById("profile-logout-btn").addEventListener("click", function () {
+      supabaseClient.auth.signOut();
+    });
+  }
+
   function renderAll() {
     renderTopbar();
     renderHome();
@@ -1187,6 +1208,7 @@
     renderTemplatesTab();
     renderAnalytics();
     renderSettings();
+    renderProfile();
   }
 
   // ==================== PWA INSTALL ====================
@@ -1214,15 +1236,7 @@
   // ==================== INIT ====================
 
   document.addEventListener("DOMContentLoaded", function () {
-    initAuthUI();
-    initNav();
-    initTheme();
-    initFinancialCalculator();
-    initDashboardToggle();
-    initSettings();
-    initCoach();
-    initChestModal();
-
+    // Auth wiring goes first and is never blocked by other features failing to init.
     supabaseClient.auth.onAuthStateChange(function (event, session) {
       state.session = session;
       if (session) { showApp(); loadAllData(); }
@@ -1233,6 +1247,14 @@
       state.session = res.data.session;
       if (state.session) { showApp(); loadAllData(); }
       else { showAuthScreen(); }
+    });
+
+    var initializers = [
+      initAuthUI, initNav, initTheme, initFinancialCalculator,
+      initDashboardToggle, initSettings, initCoach, initChestModal, initProfile
+    ];
+    initializers.forEach(function (fn) {
+      try { fn(); } catch (e) { console.error("Axis: " + fn.name + " failed to init", e); }
     });
   });
 })();
