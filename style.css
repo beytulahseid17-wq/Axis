@@ -1184,3 +1184,78 @@ h1, h2, h3 {
     animation: none !important;
   }
 }
+
+/* ============ Chest reward video modal ============ */
+
+.chest-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 17, 12, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 70;
+  padding: 1.25rem;
+}
+
+.chest-modal-card {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 1.5rem;
+  width: min(360px, 100%);
+  text-align: center;
+  position: relative;
+  box-shadow: 0 20px 50px rgba(0,0,0,0.35);
+  animation: chest-card-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes chest-card-in {
+  0% { transform: scale(0.85); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.chest-modal-close {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  background: none;
+  border: none;
+  font-size: 1.4rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  line-height: 1;
+}
+
+.chest-video {
+  width: 100%;
+  border-radius: 14px;
+  display: block;
+  margin-bottom: 1rem;
+  background: #000;
+}
+
+.chest-modal-title {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+}
+
+.chest-modal-sub {
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--gold);
+  margin: 0 0 0.9rem;
+}
+
+.chest-unmute-btn {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.45rem 1rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.chest-unmute-btn:hover { border-color: var(--accent); color: var(--accent); }
