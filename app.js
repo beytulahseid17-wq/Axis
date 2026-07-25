@@ -10,17 +10,48 @@
 
   if (!supabaseClient) {
     document.addEventListener("DOMContentLoaded", function () {
-      var authScreen = document.getElementById("auth-screen");
-      if (authScreen) {
-        authScreen.innerHTML =
-          '<div class="wordmark" style="margin-bottom:1rem;">Axis <span>Planner</span></div>' +
-          '<p style="color:#E85A4C;font-size:0.9rem;line-height:1.6;">' +
-          'Setup issue: config.js is missing a valid SUPABASE_URL / SUPABASE_ANON_KEY. ' +
-          'Open config.js and paste in your real Project URL and key from Supabase → Settings → API, then reload.' +
-          '</p>';
-      }
+      var banner = document.createElement("div");
+      banner.style.cssText = "position:fixed;inset:0;background:#F8F7F2;display:flex;align-items:center;justify-content:center;padding:2rem;z-index:999;font-family:sans-serif;";
+      banner.innerHTML =
+        '<div style="max-width:360px;text-align:center;">' +
+        '<div style="font-weight:700;font-size:1.2rem;margin-bottom:1rem;">Axis <span style="color:#4F46E5;">Planner</span></div>' +
+        '<p style="color:#E85A4C;font-size:0.9rem;line-height:1.6;">Setup issue: config.js is missing a valid SUPABASE_URL / SUPABASE_ANON_KEY. Open config.js and paste in your real Project URL and key from Supabase → Settings → API, then reload.</p>' +
+        '</div>';
+      document.body.innerHTML = "";
+      document.body.appendChild(banner);
     });
     return;
+  }
+
+  var GUEST_KEY = "axis-guest-data";
+
+  function uid() {
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+  }
+
+  function loadGuestState() {
+    try {
+      var raw = JSON.parse(localStorage.getItem(GUEST_KEY));
+      if (!raw) throw new Error("empty");
+      return raw;
+    } catch (e) {
+      return {
+        habits: [], entriesByHabit: {}, financial: { income: 0, outcome: 0 },
+        transactions: [], financialGoals: [], generalGoals: [], trips: [],
+        coins: 0, journeyMilestoneClaimed: 0, displayName: ""
+      };
+    }
+  }
+
+  function saveGuestState() {
+    try {
+      localStorage.setItem(GUEST_KEY, JSON.stringify({
+        habits: state.habits, entriesByHabit: state.entriesByHabit, financial: state.financial,
+        transactions: state.transactions, financialGoals: state.financialGoals, generalGoals: state.generalGoals,
+        trips: state.trips, coins: state.coins, journeyMilestoneClaimed: state.journeyMilestoneClaimed,
+        displayName: state.displayName
+      }));
+    } catch (e) { console.error("Axis: could not save guest data", e); }
   }
 
   var state = {
@@ -76,69 +107,99 @@
     return '<div class="stat-card"><span class="stat-value">' + value + '</span><span class="stat-label">' + label + '</span></div>';
   }
 
-  // ==================== AUTH ====================
+  // ==================== AUTH GATE (guest-first) ====================
 
-  function showAuthError(message) {
-    var el = document.getElementById("auth-error");
-    el.textContent = message;
-    el.classList.remove("hidden");
+  var PROTECTED_PAGES = ["settings", "profile"];
+  var gateAuthMode = "signup";
+
+  function openAuthGate(context) {
+    var gate = document.getElementById("auth-gate");
+    var title = document.getElementById("auth-gate-title");
+    var sub = document.getElementById("auth-gate-sub");
+    var submitBtn = document.getElementById("gate-submit");
+    var toggleBtn = document.getElementById("gate-toggle");
+
+    var contextMessages = {
+      ai: ["Unlock your AI coach", "Sign up to chat with your personal coaching AI."],
+      profile: ["Create your profile", "Sign up to save your progress across devices."],
+      settings: ["Account required", "Sign up to save your preferences and data."],
+      default: ["Create your account", "Sign up to sync your data across devices."]
+    };
+    var msg = contextMessages[context] || contextMessages.default;
+    title.textContent = msg[0];
+    sub.textContent = msg[1];
+    gateAuthMode = "signup";
+    submitBtn.textContent = "Create account";
+    toggleBtn.textContent = "Already have an account? Log in";
+    document.getElementById("gate-error").classList.add("hidden");
+    gate.classList.remove("hidden");
   }
 
-  function clearAuthError() { document.getElementById("auth-error").classList.add("hidden"); }
+  function closeAuthGate() {
+    document.getElementById("auth-gate").classList.add("hidden");
+  }
 
-  var authMode = "login";
-
-  function initAuthUI() {
-    var form = document.getElementById("auth-form");
-    var toggle = document.getElementById("auth-toggle");
-    var title = document.getElementById("auth-title");
-    var submitBtn = document.getElementById("auth-submit");
+  function initAuthGate() {
+    var form = document.getElementById("auth-gate-form");
+    var toggle = document.getElementById("gate-toggle");
+    var submitBtn = document.getElementById("gate-submit");
 
     toggle.addEventListener("click", function () {
-      authMode = authMode === "login" ? "signup" : "login";
-      title.textContent = authMode === "login" ? "Log in" : "Sign up";
-      submitBtn.textContent = authMode === "login" ? "Log in" : "Sign up";
-      toggle.textContent = authMode === "login" ? "Don't have an account? Sign up" : "Already have an account? Log in";
-      clearAuthError();
+      gateAuthMode = gateAuthMode === "signup" ? "login" : "signup";
+      submitBtn.textContent = gateAuthMode === "signup" ? "Create account" : "Log in";
+      document.getElementById("auth-gate-title").textContent = gateAuthMode === "signup" ? "Create your account" : "Welcome back";
+      toggle.textContent = gateAuthMode === "signup" ? "Already have an account? Log in" : "Don't have an account? Sign up";
+      document.getElementById("gate-error").classList.add("hidden");
     });
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
-      clearAuthError();
-      var email = document.getElementById("auth-email").value.trim();
-      var password = document.getElementById("auth-password").value;
+      var email = document.getElementById("gate-email").value.trim();
+      var password = document.getElementById("gate-password").value;
       if (!email || !password) return;
 
       submitBtn.disabled = true;
-      var action = authMode === "login"
+      var action = gateAuthMode === "login"
         ? supabaseClient.auth.signInWithPassword({ email: email, password: password })
         : supabaseClient.auth.signUp({ email: email, password: password });
 
       action.then(function (res) {
         submitBtn.disabled = false;
-        if (res.error) { showAuthError(res.error.message); return; }
-        if (authMode === "signup" && !res.data.session) {
-          showAuthError("Check your email to confirm your account, then log in.");
+        if (res.error) {
+          document.getElementById("gate-error").textContent = res.error.message;
+          document.getElementById("gate-error").classList.remove("hidden");
+          return;
         }
+        if (gateAuthMode === "signup" && !res.data.session) {
+          document.getElementById("gate-error").textContent = "Check your email to confirm, then log in.";
+          document.getElementById("gate-error").classList.remove("hidden");
+          return;
+        }
+        closeAuthGate();
       });
     });
 
-    document.getElementById("logout-btn").addEventListener("click", function () { supabaseClient.auth.signOut(); });
-  }
+    document.getElementById("auth-gate-close").addEventListener("click", closeAuthGate);
+    document.getElementById("auth-gate").addEventListener("click", function (e) {
+      if (e.target.id === "auth-gate") closeAuthGate();
+    });
 
-  function showAuthScreen() {
-    document.getElementById("auth-screen").classList.remove("hidden");
-    document.getElementById("app-shell").classList.add("hidden");
-  }
-
-  function showApp() {
-    document.getElementById("auth-screen").classList.add("hidden");
-    document.getElementById("app-shell").classList.remove("hidden");
+    var logoutBtns = ["logout-btn"];
+    logoutBtns.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (el) el.addEventListener("click", function () { supabaseClient.auth.signOut(); });
+    });
   }
 
   // ==================== NAVIGATION ====================
 
+  function isGuest() { return !state.session; }
+
   function goToPage(pageId) {
+    if (PROTECTED_PAGES.indexOf(pageId) !== -1 && isGuest()) {
+      openAuthGate(pageId);
+      return;
+    }
     document.querySelectorAll(".page").forEach(function (el) {
       el.classList.toggle("hidden", el.getAttribute("data-page") !== pageId);
     });
@@ -164,6 +225,8 @@
         goToPage(el.getAttribute("data-page-link"));
       });
     });
+    var profileFab = document.getElementById("profile-fab");
+    if (profileFab) profileFab.addEventListener("click", function () { goToPage("profile"); });
   }
 
   // ==================== THEME ====================
@@ -171,10 +234,16 @@
   function initTheme() {
     var saved = localStorage.getItem("axis-theme");
     if (saved === "dark") document.body.classList.add("dark-theme");
-    document.getElementById("theme-toggle-btn").addEventListener("click", function () {
+    var btn = document.getElementById("theme-btn");
+    var label = document.getElementById("theme-label");
+    if (btn) btn.addEventListener("click", function () {
       document.body.classList.toggle("dark-theme");
-      localStorage.setItem("axis-theme", document.body.classList.contains("dark-theme") ? "dark" : "light");
+      var dark = document.body.classList.contains("dark-theme");
+      localStorage.setItem("axis-theme", dark ? "dark" : "light");
+      if (label) label.textContent = dark ? "Light mode" : "Dark mode";
     });
+    var dark = document.body.classList.contains("dark-theme");
+    if (label) label.textContent = dark ? "Light mode" : "Dark mode";
   }
 
   // ==================== AD RAIL ====================
@@ -211,6 +280,7 @@
   function adjustCoins(delta) {
     state.coins = Math.max(0, state.coins + delta);
     updateCoinDisplay();
+    if (isGuest()) { saveGuestState(); return; }
     supabaseClient.from("profiles").update({ coins: state.coins }).eq("id", state.session.user.id)
       .then(function (res) { if (res.error) console.error("Axis: coin update failed", res.error); });
   }
@@ -220,11 +290,12 @@
   function renderTopbar() {
     var habits = dailyHabits();
     var bestStreak = habits.reduce(function (max, h) { return Math.max(max, habitStreak(h.id)); }, 0);
-    document.getElementById("streak-count").textContent = bestStreak;
+    var streakEl = document.getElementById("streak-count");
+    if (streakEl) streakEl.textContent = bestStreak;
+    var coinEl = document.getElementById("coin-count");
+    if (coinEl) coinEl.textContent = state.coins;
+
     var remaining = habits.filter(function (h) { return !isDone(h.id, 0); }).length;
-    var badge = document.getElementById("notif-badge");
-    badge.textContent = remaining;
-    badge.classList.toggle("hidden", remaining === 0);
     var mobileBadge = document.getElementById("mobile-notif-badge");
     if (mobileBadge) {
       mobileBadge.textContent = remaining;
@@ -232,10 +303,28 @@
     }
 
     var emailEl = document.getElementById("dash-user-email");
-    if (emailEl) emailEl.textContent = "Back out, " + (state.session ? state.session.user.email : "");
+    if (emailEl) emailEl.textContent = state.session ? state.session.user.email : "Guest — sign up to save your data";
   }
 
   // ==================== DATA LOADING ====================
+
+  function loadGuestData() {
+    var guest = loadGuestState();
+    state.habits = guest.habits;
+    state.entriesByHabit = guest.entriesByHabit;
+    state.financial = guest.financial;
+    state.transactions = guest.transactions;
+    state.financialGoals = guest.financialGoals;
+    state.generalGoals = guest.generalGoals;
+    state.trips = guest.trips;
+    state.coins = guest.coins;
+    state.journeyMilestoneClaimed = guest.journeyMilestoneClaimed;
+    state.displayName = guest.displayName;
+    state.plan = "free";
+    updateAdRail();
+    updateCoinDisplay();
+    renderAll();
+  }
 
   function loadAllData() {
     var userId = state.session.user.id;
@@ -304,6 +393,12 @@
 
   function addHabit(name) {
     if (!name.trim()) return;
+    if (isGuest()) {
+      state.habits.push({ id: uid(), dimension: "daily", name: name.trim() });
+      saveGuestState();
+      renderDaily(); renderHome(); renderDashboard(); renderTemplatesTab();
+      return;
+    }
     var userId = state.session.user.id;
     supabaseClient.from("habits").insert({ user_id: userId, dimension: "daily", name: name.trim() })
       .select().single()
@@ -317,13 +412,13 @@
   function removeHabit(habitId) {
     state.habits = state.habits.filter(function (h) { return h.id !== habitId; });
     renderDaily(); renderHome(); renderDashboard();
+    if (isGuest()) { saveGuestState(); return; }
     supabaseClient.from("habits").delete().eq("id", habitId).then(function (res) {
       if (res.error) console.error("Axis: remove habit failed", res.error);
     });
   }
 
   function toggleHabit(habitId) {
-    var userId = state.session.user.id;
     var today = dateStr(0);
     var currentlyDone = isDone(habitId, 0);
 
@@ -334,6 +429,9 @@
     adjustCoins(currentlyDone ? -1 : 1);
     renderDaily(); renderHome(); renderDashboard(); renderAnalytics(); renderTopbar();
 
+    if (isGuest()) { saveGuestState(); return; }
+
+    var userId = state.session.user.id;
     var query = currentlyDone
       ? supabaseClient.from("habit_entries").delete().eq("habit_id", habitId).eq("entry_date", today)
       : supabaseClient.from("habit_entries").insert({ user_id: userId, habit_id: habitId, entry_date: today, completed: true });
@@ -606,6 +704,7 @@
   // ==================== FINANCIAL ====================
 
   function saveFinancialState() {
+    if (isGuest()) { saveGuestState(); return; }
     var userId = state.session.user.id;
     supabaseClient.from("financial_state")
       .upsert({ user_id: userId, income: state.financial.income, outcome: state.financial.outcome, updated_at: new Date().toISOString() })
@@ -677,6 +776,7 @@
         g.current = cur; g.target = tgt;
         updateBar();
         renderGoalDonut();
+        if (isGuest()) { saveGuestState(); return; }
         supabaseClient.from("goals").update({ current: cur, target: tgt }).eq("id", g.id)
           .then(function (res) { if (res.error) console.error("Axis: goal update failed", res.error); });
       }
@@ -687,6 +787,7 @@
         state[list] = state[list].filter(function (x) { return x.id !== g.id; });
         if (category === "financial") renderFinancialGoals(); else renderGeneralGoals();
         renderGoalDonut();
+        if (isGuest()) { saveGuestState(); return; }
         supabaseClient.from("goals").delete().eq("id", g.id).then(function (res) {
           if (res.error) console.error("Axis: goal remove failed", res.error);
         });
@@ -698,6 +799,14 @@
 
   function addGoal(category, name, target) {
     if (!name.trim()) return;
+    if (isGuest()) {
+      var newGoal = { id: uid(), category: category, name: name.trim(), current: 0, target: parseFloat(target) || 0 };
+      if (category === "financial") { state.financialGoals.push(newGoal); renderFinancialGoals(); }
+      else { state.generalGoals.push(newGoal); renderGeneralGoals(); }
+      renderGoalDonut();
+      saveGuestState();
+      return;
+    }
     var userId = state.session.user.id;
     supabaseClient.from("goals").insert({ user_id: userId, category: category, name: name.trim(), current: 0, target: parseFloat(target) || 0 })
       .select().single()
@@ -737,6 +846,13 @@
 
   function addTransaction(name, amount) {
     if (!name.trim() || !amount) return;
+    if (isGuest()) {
+      state.transactions.unshift({ id: uid(), name: name.trim(), amount: parseFloat(amount), entry_date: dateStr(0) });
+      renderTransactions();
+      renderCashflowChart();
+      saveGuestState();
+      return;
+    }
     var userId = state.session.user.id;
     supabaseClient.from("transactions").insert({ user_id: userId, name: name.trim(), amount: parseFloat(amount), entry_date: dateStr(0) })
       .select().single()
@@ -752,6 +868,7 @@
     state.transactions = state.transactions.filter(function (t) { return t.id !== id; });
     renderTransactions();
     renderCashflowChart();
+    if (isGuest()) { saveGuestState(); return; }
     supabaseClient.from("transactions").delete().eq("id", id).then(function (res) {
       if (res.error) console.error("Axis: remove transaction failed", res.error);
     });
@@ -831,6 +948,13 @@
   // ==================== TRIPS ====================
 
   function addTrip() {
+    if (isGuest()) {
+      state.trips.push({ id: uid(), name: "New trip" });
+      renderTrips();
+      renderTripSummary();
+      saveGuestState();
+      return;
+    }
     var userId = state.session.user.id;
     supabaseClient.from("trips").insert({ user_id: userId, name: "New trip" }).select().single()
       .then(function (res) {
@@ -842,6 +966,7 @@
   }
 
   function persistTrip(trip) {
+    if (isGuest()) { saveGuestState(); return; }
     supabaseClient.from("trips").update({
       name: trip.name, destination: trip.destination, start_date: trip.start_date || null,
       end_date: trip.end_date || null, budget: trip.budget, notes: trip.notes
@@ -852,6 +977,7 @@
     state.trips = state.trips.filter(function (t) { return t.id !== id; });
     renderTrips();
     renderTripSummary();
+    if (isGuest()) { saveGuestState(); return; }
     supabaseClient.from("trips").delete().eq("id", id).then(function (res) {
       if (res.error) console.error("Axis: remove trip failed", res.error);
     });
@@ -982,7 +1108,7 @@
     modal.classList.remove("hidden");
     video.currentTime = 0;
     video.muted = true;
-    document.getElementById("chest-modal-unmute").textContent = "🔇 Unmute";
+    document.getElementById("chest-modal-unmute").textContent = "Unmute";
     video.play().catch(function () { /* autoplay might be blocked — video still visible, user can tap play */ });
   }
 
@@ -1001,7 +1127,7 @@
     document.getElementById("chest-modal-unmute").addEventListener("click", function () {
       var video = document.getElementById("chest-video");
       video.muted = !video.muted;
-      this.textContent = video.muted ? "🔇 Unmute" : "🔊 Mute";
+      this.textContent = video.muted ? "Unmute" : "Mute";
     });
     document.getElementById("chest-video").addEventListener("ended", function () {
       setTimeout(closeChestModal, 600);
@@ -1015,12 +1141,30 @@
       adjustCoins(250);
       showConfetti();
       openChestModal(streak + "-day streak!", "+250 coins");
+      if (isGuest()) { saveGuestState(); return true; }
       supabaseClient.from("profiles").update({ journey_milestone_claimed: streak }).eq("id", state.session.user.id)
         .then(function (res) { if (res.error) console.error("Axis: journey milestone save failed", res.error); });
       return true;
     }
     return false;
   }
+
+  var JOURNEY_ICONS = {
+    lock: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none"><rect x="5" y="11" width="14" height="9" rx="2" fill="#fff" fill-opacity="0.9"/><path d="M8 11V8a4 4 0 0 1 8 0v3" stroke="#fff" stroke-width="2" fill="none"/><circle cx="12" cy="15.5" r="1.6" fill="#8A8070"/></svg>',
+    gift: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none"><rect x="4" y="10" width="16" height="10" rx="1.5" fill="#fff" fill-opacity="0.95"/><rect x="4" y="7" width="16" height="4" rx="1" fill="#fff"/><rect x="11" y="7" width="2" height="13" fill="#F59E0B"/><path d="M12 7c-2-4-7-3-6 0s6 0 6 0zM12 7c2-4 7-3 6 0s-6 0-6 0z" fill="#fff"/></svg>',
+    check: '<svg viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M5 13l4 4 10-10" stroke="#fff" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+    star: '<svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9-6.3 3.9 1.7-7L2 9.2l7.1-.6z"/></svg>',
+    dot: '<svg viewBox="0 0 24 24" width="16" height="16" fill="#fff"><circle cx="12" cy="12" r="7"/></svg>',
+    circle: '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="#B8AF95" stroke-width="2"><circle cx="12" cy="12" r="7"/></svg>'
+  };
+
+  var JOURNEY_MASCOT_SVG =
+    '<svg viewBox="0 0 60 60" width="46" height="46"><ellipse cx="30" cy="52" rx="14" ry="4" fill="#00000012"/>' +
+    '<circle cx="30" cy="28" r="20" fill="#4F46E5"/><circle cx="30" cy="28" r="20" fill="#fff" fill-opacity="0.08"/>' +
+    '<circle cx="23" cy="26" r="4.2" fill="#fff"/><circle cx="37" cy="26" r="4.2" fill="#fff"/>' +
+    '<circle cx="23" cy="26" r="2" fill="#23291F"/><circle cx="37" cy="26" r="2" fill="#23291F"/>' +
+    '<path d="M24 36c2.5 2.4 9.5 2.4 12 0" stroke="#23291F" stroke-width="1.6" fill="none" stroke-linecap="round"/>' +
+    '<path d="M14 20c0-6 6-9 6-9M46 20c0-6-6-9-6-9" stroke="#4F46E5" stroke-width="3" fill="none" stroke-linecap="round"/></svg>';
 
   function renderJourneyPath() {
     var streak = journeyStreak();
@@ -1048,25 +1192,25 @@
 
       if (isTeaser) {
         node.classList.add("locked");
-        node.textContent = "🔒";
+        node.innerHTML = JOURNEY_ICONS.lock;
         label.textContent = "Next up";
       } else if (isChestSlot) {
         var claimed = state.journeyMilestoneClaimed >= 7;
         var claimable = streak >= 7;
         node.classList.add("chest", claimed ? "claimed" : (claimable ? "claimable" : "locked"));
-        node.textContent = claimed ? "✅" : "🎁";
+        node.innerHTML = claimed ? JOURNEY_ICONS.check : JOURNEY_ICONS.gift;
         label.textContent = claimed ? "Claimed" : "7-day chest";
       } else {
         var dayNum = dayIndexInCycle + 1;
         if (dayNum <= streak) {
           node.classList.add("completed");
-          node.textContent = "★";
+          node.innerHTML = JOURNEY_ICONS.star;
         } else if (dayNum === streak + 1) {
           node.classList.add("current");
-          node.textContent = "●";
+          node.innerHTML = JOURNEY_ICONS.dot;
         } else {
           node.classList.add("locked");
-          node.textContent = "○";
+          node.innerHTML = JOURNEY_ICONS.circle;
         }
         label.textContent = "Day " + dayNum;
       }
@@ -1077,7 +1221,7 @@
       if (dayIndexInCycle === Math.min(streak, 6) && !isChestSlot && !isTeaser) {
         var mascot = document.createElement("span");
         mascot.className = "journey-mascot";
-        mascot.textContent = "🦉";
+        mascot.innerHTML = JOURNEY_MASCOT_SVG;
         nodeWrap.appendChild(mascot);
       }
 
@@ -1152,6 +1296,9 @@
       e.preventDefault();
       var text = input.value.trim();
       if (!text) return;
+
+      if (isGuest()) { openAuthGate("ai"); return; }
+
       addMessage(text, "user");
       input.value = "";
 
@@ -1176,24 +1323,46 @@
   // ==================== RENDER ALL ====================
 
   function renderProfile() {
-    var initial = (state.displayName || (state.session && state.session.user.email) || "A").charAt(0).toUpperCase();
-    document.getElementById("profile-fab-initial").textContent = initial;
-    document.getElementById("profile-page-avatar").textContent = initial;
-    document.getElementById("profile-name").textContent = state.displayName || "Your name";
-    document.getElementById("profile-email").textContent = state.session ? state.session.user.email : "";
-    document.getElementById("profile-plan-pill").textContent = state.plan === "premium" ? "Premium plan" : "Free plan";
+    var isLoggedIn = !!state.session;
+    var initial = isLoggedIn
+      ? (state.displayName || state.session.user.email || "A").charAt(0).toUpperCase()
+      : "G";
+    var fabEl = document.getElementById("profile-fab-initial");
+    if (fabEl) fabEl.textContent = initial;
+    var avatarEl = document.getElementById("profile-page-avatar");
+    if (avatarEl) avatarEl.textContent = initial;
+
+    var nameEl = document.getElementById("profile-name");
+    if (nameEl) nameEl.textContent = isLoggedIn ? (state.displayName || "Your name") : "Guest";
+    var emailEl = document.getElementById("profile-email");
+    if (emailEl) emailEl.textContent = isLoggedIn ? state.session.user.email : "Not signed in";
+    var pillEl = document.getElementById("profile-plan-pill");
+    if (pillEl) pillEl.textContent = !isLoggedIn ? "Guest" : (state.plan === "premium" ? "Premium" : "Free plan");
 
     var habits = dailyHabits();
     var bestStreak = habits.reduce(function (max, h) { return Math.max(max, habitStreak(h.id)); }, 0);
-    document.getElementById("profile-streak-value").textContent = bestStreak;
-    document.getElementById("profile-coins-value").textContent = state.coins;
-    document.getElementById("profile-habits-value").textContent = habits.length;
+    var sv = document.getElementById("profile-streak-value");
+    var cv = document.getElementById("profile-coins-value");
+    var hv = document.getElementById("profile-habits-value");
+    if (sv) sv.textContent = bestStreak;
+    if (cv) cv.textContent = state.coins;
+    if (hv) hv.textContent = habits.length;
+
+    var logoutBtn = document.getElementById("profile-logout-btn");
+    if (logoutBtn) {
+      if (isLoggedIn) {
+        logoutBtn.style.display = "";
+        logoutBtn.textContent = "Log out";
+      } else {
+        logoutBtn.textContent = "Sign in / Sign up";
+        logoutBtn.onclick = function () { openAuthGate("profile"); };
+      }
+    }
   }
 
   function initProfile() {
-    document.getElementById("profile-logout-btn").addEventListener("click", function () {
-      supabaseClient.auth.signOut();
-    });
+    // Logout/sign-in button behavior is set dynamically in renderProfile()
+    // depending on guest vs logged-in state.
   }
 
   function renderAll() {
@@ -1236,25 +1405,25 @@
   // ==================== INIT ====================
 
   document.addEventListener("DOMContentLoaded", function () {
-    // Auth wiring goes first and is never blocked by other features failing to init.
-    supabaseClient.auth.onAuthStateChange(function (event, session) {
-      state.session = session;
-      if (session) { showApp(); loadAllData(); }
-      else { showAuthScreen(); }
-    });
-
-    supabaseClient.auth.getSession().then(function (res) {
-      state.session = res.data.session;
-      if (state.session) { showApp(); loadAllData(); }
-      else { showAuthScreen(); }
-    });
-
     var initializers = [
-      initAuthUI, initNav, initTheme, initFinancialCalculator,
+      initAuthGate, initNav, initTheme, initFinancialCalculator,
       initDashboardToggle, initSettings, initCoach, initChestModal, initProfile
     ];
     initializers.forEach(function (fn) {
       try { fn(); } catch (e) { console.error("Axis: " + fn.name + " failed to init", e); }
+    });
+
+    // Guest-first: render local data immediately so the app is usable with no account.
+    loadGuestData();
+
+    supabaseClient.auth.onAuthStateChange(function (event, session) {
+      state.session = session;
+      if (session) { loadAllData(); }
+    });
+
+    supabaseClient.auth.getSession().then(function (res) {
+      state.session = res.data.session;
+      if (state.session) { loadAllData(); }
     });
   });
 })();
