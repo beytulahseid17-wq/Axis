@@ -24,6 +24,7 @@
   }
 
   var GUEST_KEY = "axis-guest-data";
+  var pendingOnboarding = false;
 
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -58,6 +59,9 @@
     session: null,
     plan: "free",
     displayName: "",
+    fullName: "",
+    avatarUrl: "",
+    onboardingCompleted: false,
     coins: 0,
     journeyMilestoneClaimed: 0,
     habits: [],
@@ -111,13 +115,23 @@
 
   var PROTECTED_PAGES = ["settings", "profile"];
   var gateAuthMode = "signup";
+  var pendingSignupContext = null;
+
+  function updateGateFormMode() {
+    var isSignup = gateAuthMode === "signup";
+    document.getElementById("gate-submit-label").textContent = isSignup ? "Create account" : "Log in";
+    document.getElementById("auth-gate-title").textContent = isSignup ? "Create your account" : "Welcome back";
+    document.getElementById("gate-toggle").textContent = isSignup ? "Already have an account? Log in" : "Don't have an account? Sign up";
+    document.querySelectorAll(".signup-only").forEach(function (el) { el.classList.toggle("hidden", !isSignup); });
+    document.querySelectorAll(".login-only").forEach(function (el) { el.classList.toggle("hidden", isSignup); });
+    document.getElementById("gate-error").classList.add("hidden");
+    document.getElementById("gate-success").classList.add("hidden");
+  }
 
   function openAuthGate(context) {
     var gate = document.getElementById("auth-gate");
-    var title = document.getElementById("auth-gate-title");
     var sub = document.getElementById("auth-gate-sub");
-    var submitBtn = document.getElementById("gate-submit");
-    var toggleBtn = document.getElementById("gate-toggle");
+    pendingSignupContext = context;
 
     var contextMessages = {
       ai: ["Unlock your AI coach", "Sign up to chat with your personal coaching AI."],
@@ -126,12 +140,10 @@
       default: ["Create your account", "Sign up to sync your data across devices."]
     };
     var msg = contextMessages[context] || contextMessages.default;
-    title.textContent = msg[0];
     sub.textContent = msg[1];
     gateAuthMode = "signup";
-    submitBtn.textContent = "Create account";
-    toggleBtn.textContent = "Already have an account? Log in";
-    document.getElementById("gate-error").classList.add("hidden");
+    updateGateFormMode();
+    document.getElementById("auth-gate-title").textContent = msg[0];
     gate.classList.remove("hidden");
   }
 
@@ -139,44 +151,69 @@
     document.getElementById("auth-gate").classList.add("hidden");
   }
 
+  function setGateLoading(loading) {
+    var btn = document.getElementById("gate-submit");
+    document.getElementById("gate-submit-spinner").classList.toggle("hidden", !loading);
+    btn.disabled = loading;
+  }
+
   function initAuthGate() {
     var form = document.getElementById("auth-gate-form");
     var toggle = document.getElementById("gate-toggle");
-    var submitBtn = document.getElementById("gate-submit");
 
     toggle.addEventListener("click", function () {
       gateAuthMode = gateAuthMode === "signup" ? "login" : "signup";
-      submitBtn.textContent = gateAuthMode === "signup" ? "Create account" : "Log in";
-      document.getElementById("auth-gate-title").textContent = gateAuthMode === "signup" ? "Create your account" : "Welcome back";
-      toggle.textContent = gateAuthMode === "signup" ? "Already have an account? Log in" : "Don't have an account? Sign up";
-      document.getElementById("gate-error").classList.add("hidden");
+      updateGateFormMode();
     });
 
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+      var name = document.getElementById("gate-name").value.trim();
       var email = document.getElementById("gate-email").value.trim();
       var password = document.getElementById("gate-password").value;
+      var remember = document.getElementById("gate-remember").checked;
       if (!email || !password) return;
 
-      submitBtn.disabled = true;
+      document.getElementById("gate-error").classList.add("hidden");
+      setGateLoading(true);
+
       var action = gateAuthMode === "login"
         ? supabaseClient.auth.signInWithPassword({ email: email, password: password })
-        : supabaseClient.auth.signUp({ email: email, password: password });
+        : supabaseClient.auth.signUp({ email: email, password: password, options: { data: { full_name: name } } });
 
       action.then(function (res) {
-        submitBtn.disabled = false;
+        setGateLoading(false);
         if (res.error) {
           document.getElementById("gate-error").textContent = res.error.message;
           document.getElementById("gate-error").classList.remove("hidden");
           return;
         }
+        if (gateAuthMode === "login" && !remember) {
+          sessionStorage.setItem("axis-no-remember", "1");
+        }
         if (gateAuthMode === "signup" && !res.data.session) {
-          document.getElementById("gate-error").textContent = "Check your email to confirm, then log in.";
-          document.getElementById("gate-error").classList.remove("hidden");
+          document.getElementById("gate-success").textContent = "Account created — check your email to verify, then log in.";
+          document.getElementById("gate-success").classList.remove("hidden");
+          gateAuthMode = "login";
+          updateGateFormMode();
+          document.getElementById("gate-success").classList.remove("hidden");
           return;
         }
+        if (gateAuthMode === "signup") pendingOnboarding = true;
         closeAuthGate();
       });
+    });
+
+    document.getElementById("google-login-btn").addEventListener("click", function () {
+      supabaseClient.auth.signInWithOAuth({ provider: "google", options: { redirectTo: window.location.origin } });
+    });
+    document.getElementById("apple-login-btn").addEventListener("click", function () {
+      supabaseClient.auth.signInWithOAuth({ provider: "apple", options: { redirectTo: window.location.origin } });
+    });
+
+    document.getElementById("gate-forgot").addEventListener("click", function () {
+      closeAuthGate();
+      openResetModal(document.getElementById("gate-email").value.trim());
     });
 
     document.getElementById("auth-gate-close").addEventListener("click", closeAuthGate);
@@ -189,6 +226,145 @@
       var el = document.getElementById(id);
       if (el) el.addEventListener("click", function () { supabaseClient.auth.signOut(); });
     });
+
+    // If the "remember me" box was unchecked, drop the session when the tab closes.
+    window.addEventListener("beforeunload", function () {
+      if (sessionStorage.getItem("axis-no-remember") === "1") {
+        supabaseClient.auth.signOut();
+      }
+    });
+  }
+
+  // ==================== PASSWORD RESET ====================
+
+  function openResetModal(prefillEmail) {
+    var modal = document.getElementById("reset-modal");
+    document.getElementById("reset-email").value = prefillEmail || "";
+    document.getElementById("reset-request-form").classList.remove("hidden");
+    document.getElementById("reset-password-form").classList.add("hidden");
+    document.getElementById("reset-error").classList.add("hidden");
+    document.getElementById("reset-success").classList.add("hidden");
+    modal.classList.remove("hidden");
+  }
+
+  function initResetFlow() {
+    document.getElementById("reset-modal-close").addEventListener("click", function () {
+      document.getElementById("reset-modal").classList.add("hidden");
+    });
+
+    document.getElementById("reset-request-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var email = document.getElementById("reset-email").value.trim();
+      if (!email) return;
+      supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin }).then(function (res) {
+        var errEl = document.getElementById("reset-error");
+        var okEl = document.getElementById("reset-success");
+        if (res.error) { errEl.textContent = res.error.message; errEl.classList.remove("hidden"); return; }
+        okEl.textContent = "Check your email for a reset link.";
+        okEl.classList.remove("hidden");
+      });
+    });
+
+    document.getElementById("reset-password-form").addEventListener("submit", function (e) {
+      e.preventDefault();
+      var pw = document.getElementById("new-password").value;
+      var confirm = document.getElementById("confirm-password").value;
+      var errEl = document.getElementById("reset-error");
+      if (pw !== confirm) { errEl.textContent = "Passwords don't match."; errEl.classList.remove("hidden"); return; }
+      supabaseClient.auth.updateUser({ password: pw }).then(function (res) {
+        if (res.error) { errEl.textContent = res.error.message; errEl.classList.remove("hidden"); return; }
+        var okEl = document.getElementById("reset-success");
+        okEl.textContent = "Password updated.";
+        okEl.classList.remove("hidden");
+        setTimeout(function () { document.getElementById("reset-modal").classList.add("hidden"); }, 1500);
+      });
+    });
+
+    // Supabase redirects back with #access_token=...&type=recovery in the URL hash.
+    if (window.location.hash.indexOf("type=recovery") !== -1) {
+      openResetModal();
+      document.getElementById("reset-request-form").classList.add("hidden");
+      document.getElementById("reset-password-form").classList.remove("hidden");
+    }
+  }
+
+  // ==================== ONBOARDING QUIZ ====================
+
+  var ONBOARDING_QUESTIONS = [
+    { key: "focus", title: "What do you want to focus on most?", options: ["Daily habits", "Financial tracking", "Travel planning", "Long-term goals"] },
+    { key: "reminder_time", title: "When should Axis check in with you?", options: ["Morning", "Afternoon", "Evening", "I'll open it myself"] },
+    { key: "experience", title: "Have you used a habit tracker before?", options: ["This is my first one", "I've tried a few", "I use one regularly", "I've built my own system"] },
+    { key: "motivation", title: "What keeps you motivated?", options: ["Streaks", "Seeing progress charts", "Rewards", "Just checking things off"] },
+    { key: "ai_interest", title: "Interested in AI coaching?", options: ["Yes, regularly", "Occasionally", "Not really", "Not sure yet"] }
+  ];
+
+  var onboardingStep = 0;
+  var onboardingAnswers = {};
+
+  function renderOnboardingStep() {
+    var q = ONBOARDING_QUESTIONS[onboardingStep];
+    var wrap = document.getElementById("onboarding-question-wrap");
+    document.getElementById("onboarding-progress-fill").style.width = (((onboardingStep + 1) / ONBOARDING_QUESTIONS.length) * 100) + "%";
+
+    var optionsHtml = q.options.map(function (opt) {
+      var selected = onboardingAnswers[q.key] === opt;
+      return '<button type="button" class="onboarding-option-btn' + (selected ? " selected" : "") + '" data-value="' + opt + '">' + opt + '</button>';
+    }).join("");
+
+    wrap.innerHTML =
+      '<p class="onboarding-question-title">' + q.title + '</p>' +
+      '<div class="onboarding-options-list">' + optionsHtml + '</div>' +
+      '<div class="onboarding-nav-row">' +
+      (onboardingStep > 0 ? '<button type="button" class="onboarding-back-btn" id="onboarding-back">Back</button>' : '<span></span>') +
+      '<span class="tiny-note">' + (onboardingStep + 1) + ' of ' + ONBOARDING_QUESTIONS.length + '</span>' +
+      '</div>';
+
+    wrap.querySelectorAll(".onboarding-option-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        onboardingAnswers[q.key] = btn.getAttribute("data-value");
+        if (onboardingStep < ONBOARDING_QUESTIONS.length - 1) {
+          onboardingStep++;
+          renderOnboardingStep();
+        } else {
+          finishOnboarding();
+        }
+      });
+    });
+
+    var backBtn = document.getElementById("onboarding-back");
+    if (backBtn) backBtn.addEventListener("click", function () { onboardingStep--; renderOnboardingStep(); });
+  }
+
+  function startOnboarding() {
+    onboardingStep = 0;
+    onboardingAnswers = {};
+    document.getElementById("onboarding-modal").classList.remove("hidden");
+    renderOnboardingStep();
+  }
+
+  function finishOnboarding() {
+    document.getElementById("onboarding-modal").classList.add("hidden");
+    playCompletionAnimation();
+
+    if (!isGuest()) {
+      supabaseClient.from("profiles").update({
+        preferences: onboardingAnswers, onboarding_completed: true
+      }).eq("id", state.session.user.id).then(function (res) {
+        if (res.error) console.error("Axis: save onboarding answers failed", res.error);
+      });
+    }
+  }
+
+  function playCompletionAnimation() {
+    var screen = document.getElementById("completion-screen");
+    screen.classList.remove("hidden");
+    // restart CSS animations each time this plays
+    var clone = screen.cloneNode(true);
+    screen.parentNode.replaceChild(clone, screen);
+    clone.classList.remove("hidden");
+    setTimeout(function () {
+      clone.classList.add("hidden");
+    }, 2400);
   }
 
   // ==================== NAVIGATION ====================
@@ -331,7 +507,7 @@
     var since = dateStr(60);
 
     var calls = [
-      supabaseClient.from("profiles").select("plan, display_name, coins, journey_milestone_claimed").eq("id", userId).single(),
+      supabaseClient.from("profiles").select("plan, display_name, coins, journey_milestone_claimed, full_name, avatar_url, onboarding_completed").eq("id", userId).single(),
       supabaseClient.from("habits").select("*").eq("user_id", userId).eq("is_active", true).order("created_at"),
       supabaseClient.from("habit_entries").select("habit_id, entry_date").eq("user_id", userId).gte("entry_date", since),
       supabaseClient.from("financial_state").select("*").eq("user_id", userId).maybeSingle(),
@@ -349,6 +525,9 @@
         state.displayName = profileRes.data.display_name || "";
         state.coins = profileRes.data.coins || 0;
         state.journeyMilestoneClaimed = profileRes.data.journey_milestone_claimed || 0;
+        state.fullName = profileRes.data.full_name || "";
+        state.avatarUrl = profileRes.data.avatar_url || "";
+        state.onboardingCompleted = !!profileRes.data.onboarding_completed;
       }
       if (habitsRes.error) console.error("Axis: habits fetch failed", habitsRes.error);
       state.habits = habitsRes.data || [];
@@ -1247,18 +1426,42 @@
   // ==================== SETTINGS ====================
 
   function renderSettings() {
-    document.getElementById("settings-name-input").value = state.displayName;
+    document.getElementById("settings-name-input").value = state.fullName || state.displayName;
     document.getElementById("settings-plan-label").textContent = state.plan === "premium" ? "Premium plan" : "Free plan";
+    var emailInput = document.getElementById("settings-email-input");
+    if (emailInput) emailInput.value = state.session ? state.session.user.email : "";
+    var preview = document.getElementById("settings-avatar-preview");
+    if (preview) {
+      var initial = (state.fullName || state.displayName || "A").charAt(0).toUpperCase();
+      if (state.avatarUrl) {
+        preview.style.backgroundImage = "url(" + state.avatarUrl + ")";
+        preview.textContent = "";
+      } else {
+        preview.style.backgroundImage = "none";
+        preview.textContent = initial;
+      }
+    }
+  }
+
+  function flashNote(id, text, isError) {
+    var el = document.getElementById(id);
+    el.textContent = text;
+    el.style.color = isError ? "var(--physical)" : "var(--mental)";
+    el.classList.remove("hidden");
+    setTimeout(function () { el.classList.add("hidden"); }, 3000);
   }
 
   function initSettings() {
     document.getElementById("settings-save-btn").addEventListener("click", function () {
       var name = document.getElementById("settings-name-input").value.trim();
       state.displayName = name;
-      supabaseClient.from("profiles").update({ display_name: name }).eq("id", state.session.user.id)
+      state.fullName = name;
+      if (isGuest()) { saveGuestState(); renderTopbar(); renderProfile(); return; }
+      supabaseClient.from("profiles").update({ display_name: name, full_name: name }).eq("id", state.session.user.id)
         .then(function (res) {
           if (res.error) { console.error("Axis: save name failed", res.error); return; }
           renderTopbar();
+          renderProfile();
           var note = document.getElementById("settings-saved-note");
           note.classList.remove("hidden");
           setTimeout(function () { note.classList.add("hidden"); }, 2000);
@@ -1268,6 +1471,65 @@
     document.getElementById("upgrade-link").addEventListener("click", function (e) {
       e.preventDefault();
       alert("Payments aren't connected yet. This link will go to your Lemon Squeezy checkout once it's set up.");
+    });
+
+    // Avatar upload
+    var fileInput = document.getElementById("avatar-file-input");
+    document.getElementById("avatar-upload-btn").addEventListener("click", function () {
+      if (isGuest()) { openAuthGate("settings"); return; }
+      fileInput.click();
+    });
+    fileInput.addEventListener("change", function () {
+      var file = fileInput.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) { alert("Please choose an image under 2MB."); return; }
+      var userId = state.session.user.id;
+      var path = userId + "/" + Date.now() + "-" + file.name.replace(/[^a-z0-9.]/gi, "_");
+      supabaseClient.storage.from("avatars").upload(path, file, { upsert: true }).then(function (res) {
+        if (res.error) { alert("Upload failed: " + res.error.message); return; }
+        var publicUrl = supabaseClient.storage.from("avatars").getPublicUrl(path).data.publicUrl;
+        state.avatarUrl = publicUrl;
+        supabaseClient.from("profiles").update({ avatar_url: publicUrl }).eq("id", userId).then(function (r2) {
+          if (r2.error) console.error("Axis: save avatar url failed", r2.error);
+          renderSettings();
+          renderProfile();
+        });
+      });
+    });
+
+    // Email update
+    document.getElementById("settings-email-save-btn").addEventListener("click", function () {
+      if (isGuest()) { openAuthGate("settings"); return; }
+      var newEmail = document.getElementById("settings-email-input").value.trim();
+      if (!newEmail) return;
+      supabaseClient.auth.updateUser({ email: newEmail }).then(function (res) {
+        if (res.error) { flashNote("settings-email-note", res.error.message, true); return; }
+        flashNote("settings-email-note", "Check your new email to confirm the change.", false);
+      });
+    });
+
+    // Password update
+    document.getElementById("settings-password-save-btn").addEventListener("click", function () {
+      if (isGuest()) { openAuthGate("settings"); return; }
+      var pw = document.getElementById("settings-new-password").value;
+      if (!pw || pw.length < 6) { flashNote("settings-password-note", "Password must be at least 6 characters.", true); return; }
+      supabaseClient.auth.updateUser({ password: pw }).then(function (res) {
+        if (res.error) { flashNote("settings-password-note", res.error.message, true); return; }
+        document.getElementById("settings-new-password").value = "";
+        flashNote("settings-password-note", "Password updated.", false);
+      });
+    });
+
+    // Delete account (request — actual deletion requires a server-side admin function)
+    document.getElementById("delete-account-btn").addEventListener("click", function () {
+      if (isGuest()) { openAuthGate("settings"); return; }
+      if (!confirm("Request account deletion? This can't be undone once processed.")) return;
+      supabaseClient.from("profiles").update({ deletion_requested_at: new Date().toISOString() }).eq("id", state.session.user.id)
+        .then(function (res) {
+          if (res.error) { flashNote("delete-account-note", res.error.message, true); return; }
+          flashNote("delete-account-note", "Deletion requested. You'll be logged out now.", false);
+          setTimeout(function () { supabaseClient.auth.signOut(); }, 1800);
+        });
     });
   }
 
@@ -1324,16 +1586,27 @@
 
   function renderProfile() {
     var isLoggedIn = !!state.session;
+    var displayLabel = state.fullName || state.displayName;
     var initial = isLoggedIn
-      ? (state.displayName || state.session.user.email || "A").charAt(0).toUpperCase()
+      ? (displayLabel || state.session.user.email || "A").charAt(0).toUpperCase()
       : "G";
     var fabEl = document.getElementById("profile-fab-initial");
     if (fabEl) fabEl.textContent = initial;
     var avatarEl = document.getElementById("profile-page-avatar");
-    if (avatarEl) avatarEl.textContent = initial;
+    if (avatarEl) {
+      if (isLoggedIn && state.avatarUrl) {
+        avatarEl.style.backgroundImage = "url(" + state.avatarUrl + ")";
+        avatarEl.style.backgroundSize = "cover";
+        avatarEl.style.backgroundPosition = "center";
+        avatarEl.textContent = "";
+      } else {
+        avatarEl.style.backgroundImage = "none";
+        avatarEl.textContent = initial;
+      }
+    }
 
     var nameEl = document.getElementById("profile-name");
-    if (nameEl) nameEl.textContent = isLoggedIn ? (state.displayName || "Your name") : "Guest";
+    if (nameEl) nameEl.textContent = isLoggedIn ? (displayLabel || "Your name") : "Guest";
     var emailEl = document.getElementById("profile-email");
     if (emailEl) emailEl.textContent = isLoggedIn ? state.session.user.email : "Not signed in";
     var pillEl = document.getElementById("profile-plan-pill");
@@ -1406,7 +1679,7 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     var initializers = [
-      initAuthGate, initNav, initTheme, initFinancialCalculator,
+      initAuthGate, initResetFlow, initNav, initTheme, initFinancialCalculator,
       initDashboardToggle, initSettings, initCoach, initChestModal, initProfile
     ];
     initializers.forEach(function (fn) {
@@ -1418,7 +1691,14 @@
 
     supabaseClient.auth.onAuthStateChange(function (event, session) {
       state.session = session;
-      if (session) { loadAllData(); }
+      if (session) {
+        loadAllData().then(function () {
+          if (pendingOnboarding && !state.onboardingCompleted) {
+            pendingOnboarding = false;
+            startOnboarding();
+          }
+        });
+      }
     });
 
     supabaseClient.auth.getSession().then(function (res) {
