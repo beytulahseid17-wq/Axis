@@ -70,7 +70,8 @@
     transactions: [],
     financialGoals: [],
     generalGoals: [],
-    trips: []
+    trips: [],
+    notes: []
   };
 
   var TEMPLATES = [
@@ -113,7 +114,6 @@
 
   // ==================== AUTH GATE (guest-first) ====================
 
-  var PROTECTED_PAGES = ["settings", "profile"];
   var gateAuthMode = "signup";
   var pendingSignupContext = null;
 
@@ -212,13 +212,7 @@
     });
 
     document.getElementById("gate-forgot").addEventListener("click", function () {
-      closeAuthGate();
       openResetModal(document.getElementById("gate-email").value.trim());
-    });
-
-    document.getElementById("auth-gate-close").addEventListener("click", closeAuthGate);
-    document.getElementById("auth-gate").addEventListener("click", function (e) {
-      if (e.target.id === "auth-gate") closeAuthGate();
     });
 
     var logoutBtns = ["logout-btn"];
@@ -372,10 +366,6 @@
   function isGuest() { return !state.session; }
 
   function goToPage(pageId) {
-    if (PROTECTED_PAGES.indexOf(pageId) !== -1 && isGuest()) {
-      openAuthGate(pageId);
-      return;
-    }
     document.querySelectorAll(".page").forEach(function (el) {
       el.classList.toggle("hidden", el.getAttribute("data-page") !== pageId);
     });
@@ -477,9 +467,6 @@
       mobileBadge.textContent = remaining;
       mobileBadge.classList.toggle("hidden", remaining === 0);
     }
-
-    var emailEl = document.getElementById("dash-user-email");
-    if (emailEl) emailEl.textContent = state.session ? state.session.user.email : "Guest — sign up to save your data";
   }
 
   // ==================== DATA LOADING ====================
@@ -513,12 +500,14 @@
       supabaseClient.from("financial_state").select("*").eq("user_id", userId).maybeSingle(),
       supabaseClient.from("transactions").select("*").eq("user_id", userId).order("entry_date", { ascending: false }).limit(30),
       supabaseClient.from("goals").select("*").eq("user_id", userId).order("created_at"),
-      supabaseClient.from("trips").select("*").eq("user_id", userId).order("created_at")
+      supabaseClient.from("trips").select("*").eq("user_id", userId).order("created_at"),
+      supabaseClient.from("notes").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(10)
     ];
 
     return Promise.all(calls).then(function (results) {
       var profileRes = results[0], habitsRes = results[1], entriesRes = results[2],
-          finRes = results[3], txRes = results[4], goalsRes = results[5], tripsRes = results[6];
+          finRes = results[3], txRes = results[4], goalsRes = results[5], tripsRes = results[6],
+          notesRes = results[7];
 
       if (profileRes.data) {
         state.plan = profileRes.data.plan || "free";
@@ -544,6 +533,8 @@
       state.financialGoals = goals.filter(function (g) { return g.category === "financial"; });
       state.generalGoals = goals.filter(function (g) { return g.category === "general"; });
       state.trips = tripsRes.data || [];
+      if (notesRes.error) console.error("Axis: notes fetch failed", notesRes.error);
+      state.notes = notesRes.data || [];
 
       updateAdRail();
       updateCoinDisplay();
@@ -782,76 +773,210 @@
       '</svg>';
   }
 
-  function renderTrackerTable() {
+  function renderTaskProgressDonut() {
     var habits = dailyHabits();
-    var table = document.getElementById("tracker-table");
-    var days = 7;
+    var doneCount = habits.filter(function (h) { return isDone(h.id, 0); }).length;
+    var pct = habits.length ? Math.round((doneCount / habits.length) * 100) : 0;
+    var pendingPct = 100 - pct;
 
-    var dayLabels = [];
-    for (var i = days - 1; i >= 0; i--) {
-      var d = new Date(); d.setDate(d.getDate() - i);
-      dayLabels.push({ offset: i, label: "D" + (days - i) });
-    }
-
-    var head = "<tr><th>Task</th>" + dayLabels.map(function (d) { return "<th>" + d.label + "</th>"; }).join("") + "</tr>";
-
-    var rows = habits.map(function (h) {
-      var cells = dayLabels.map(function (d) {
-        var done = isDone(h.id, d.offset);
-        var editable = d.offset === 0;
-        return '<td><span class="tracker-check' + (done ? " done" : "") + (editable ? " editable" : "") + '" data-habit="' + h.id + '" data-editable="' + editable + '"></span></td>';
-      }).join("");
-      return "<tr><td>" + h.name + "</td>" + cells + "</tr>";
-    }).join("");
-
-    if (habits.length === 0) {
-      table.innerHTML = head + '<tr><td colspan="' + (days + 1) + '" class="empty-note">Add habits on the Daily tab to see them here.</td></tr>';
-      return;
-    }
-
-    table.innerHTML = head + rows;
-    table.querySelectorAll(".tracker-check.editable").forEach(function (el) {
-      el.addEventListener("click", function () { toggleHabit(el.getAttribute("data-habit")); });
-    });
-  }
-
-  function renderTripSummary() {
-    var wrap = document.getElementById("dash-trip-summary");
-    var today = dateStr(0);
-    var upcoming = state.trips
-      .filter(function (t) { return !t.start_date || t.start_date >= today; })
-      .sort(function (a, b) { return (a.start_date || "9999").localeCompare(b.start_date || "9999"); });
-
-    if (upcoming.length === 0) {
-      wrap.innerHTML =
-        '<div class="trip-summary-empty">' +
-        '<div class="trip-summary-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/></svg></div>' +
-        '<p style="margin:0.6rem 0 0.9rem;">No upcoming trips</p>' +
-        '<button type="button" class="calc-btn" data-page-link="trip">+ Add Trip Plan</button>' +
-        '</div>';
-    } else {
-      var t = upcoming[0];
-      wrap.innerHTML =
-        '<p style="font-weight:700;margin:0 0 0.3rem;">' + (t.name || "Untitled trip") + '</p>' +
-        '<p style="color:var(--text-muted);font-size:0.85rem;margin:0 0 0.6rem;">' + (t.destination || "No destination set") +
-        (t.start_date ? " · " + t.start_date : "") + '</p>' +
-        '<button type="button" class="calc-btn" data-page-link="trip">View all trips</button>';
-    }
-    wrap.querySelectorAll("[data-page-link]").forEach(function (el) {
-      el.addEventListener("click", function () { goToPage(el.getAttribute("data-page-link")); });
-    });
-  }
-
-  function renderGoalDonut() {
-    var goals = state.financialGoals.concat(state.generalGoals).filter(function (g) { return g.target > 0; });
-    var pct = 0;
-    if (goals.length > 0) {
-      var sum = goals.reduce(function (acc, g) { return acc + Math.min(g.current / g.target, 1); }, 0);
-      pct = Math.round((sum / goals.length) * 100);
-    }
     var donut = document.getElementById("dash-donut");
     donut.style.background = "conic-gradient(var(--accent) " + pct + "%, var(--surface-2) " + pct + "%)";
     document.getElementById("dash-donut-value").textContent = pct + "%";
+    document.getElementById("dash-donut-label").textContent = "Completed";
+
+    document.getElementById("dash-donut-legend").innerHTML =
+      '<div class="donut-legend-row"><span><span class="donut-legend-dot" style="background:var(--accent);"></span>Completed</span><span>' + pct + '%</span></div>' +
+      '<div class="donut-legend-row"><span><span class="donut-legend-dot" style="background:var(--surface-2);border:1px solid var(--line);"></span>Pending</span><span>' + pendingPct + '%</span></div>';
+  }
+
+  function renderDashGreeting() {
+    var hour = new Date().getHours();
+    var timeGreeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+    var name = state.fullName || state.displayName;
+    document.getElementById("dash-greeting").textContent = timeGreeting + (name ? ", " + name + "!" : "!");
+    var aiGreeting = document.getElementById("ai-inline-greeting");
+    if (aiGreeting) aiGreeting.textContent = (name ? "Hi " + name + "! " : "Hi! ") + "How can I help you be more productive today?";
+  }
+
+  function renderDashStats() {
+    var habits = dailyHabits();
+    var doneCount = habits.filter(function (h) { return isDone(h.id, 0); }).length;
+    var todayPct = habits.length ? Math.round((doneCount / habits.length) * 100) : 0;
+    var yesterdayPct = Math.round(dayCompletionPct(1));
+    var diff = todayPct - yesterdayPct;
+
+    document.getElementById("stat-focus-score").textContent = todayPct + "%";
+    var trendEl = document.getElementById("stat-focus-trend");
+    if (habits.length === 0) { trendEl.textContent = ""; }
+    else {
+      trendEl.textContent = (diff >= 0 ? "↑ " : "↓ ") + Math.abs(diff) + "% from yesterday";
+      trendEl.style.color = diff >= 0 ? "var(--accent)" : "var(--physical)";
+    }
+
+    document.getElementById("stat-tasks-today").textContent = doneCount + "/" + habits.length;
+    document.getElementById("stat-tasks-pct").textContent = todayPct + "% completed";
+    document.getElementById("stat-tasks-ring").style.background =
+      "conic-gradient(var(--accent) " + todayPct + "%, var(--surface-2) " + todayPct + "%)";
+
+    document.getElementById("stat-streak").textContent = journeyStreak();
+    document.getElementById("stat-coins").textContent = state.coins;
+  }
+
+  function renderTodayPlan() {
+    var wrap = document.getElementById("dash-today-plan");
+    var habits = dailyHabits();
+    wrap.innerHTML = "";
+    wrap.appendChild(buildHabitListEl(habits));
+  }
+
+  function renderTemplatesPreview() {
+    var wrap = document.getElementById("dash-templates-preview");
+    wrap.innerHTML = "";
+    TEMPLATES.slice(0, 4).forEach(function (t) {
+      var card = document.createElement("div");
+      card.className = "template-preview-card";
+      card.innerHTML = "<h4>" + t.name + "</h4>";
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "Add";
+      btn.addEventListener("click", function () { applyTemplate(t.items); goToPage("daily"); });
+      card.appendChild(btn);
+      wrap.appendChild(card);
+    });
+  }
+
+  function renderGoalsPreview() {
+    var wrap = document.getElementById("dash-goals-preview");
+    var goals = state.financialGoals.concat(state.generalGoals).slice(0, 3);
+    if (goals.length === 0) {
+      wrap.innerHTML = '<p class="empty-note">No goals yet.</p>';
+      return;
+    }
+    wrap.innerHTML = goals.map(function (g) {
+      var pct = g.target > 0 ? Math.min(Math.round((g.current / g.target) * 100), 100) : 0;
+      return '<div style="margin-bottom:0.9rem;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:0.35rem;"><span>' + g.name + '</span><span style="color:var(--text-muted);">' + pct + '%</span></div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--accent);"></div></div>' +
+        '</div>';
+    }).join("");
+  }
+
+  function renderHabitsWeekGrid() {
+    var wrap = document.getElementById("dash-habits-grid");
+    var habits = dailyHabits();
+    if (habits.length === 0) {
+      wrap.innerHTML = '<p class="empty-note">No habits yet.</p>';
+      return;
+    }
+    var dayLetters = [];
+    for (var i = 6; i >= 0; i--) {
+      var d = new Date(); d.setDate(d.getDate() - i);
+      dayLetters.push(d.toLocaleDateString(undefined, { weekday: "narrow" }));
+    }
+    var header = '<div class="habit-week-row"><span></span>' +
+      dayLetters.map(function (l) { return '<span class="tiny-note" style="text-align:center;">' + l + '</span>'; }).join("") + '</div>';
+
+    var rows = habits.slice(0, 6).map(function (h) {
+      var cells = "";
+      for (var i = 6; i >= 0; i--) {
+        var done = isDone(h.id, i);
+        cells += '<span class="habit-week-dot' + (done ? " done" : "") + '"></span>';
+      }
+      return '<div class="habit-week-row"><span class="habit-week-name">' + h.name + '</span>' + cells + '</div>';
+    }).join("");
+
+    wrap.innerHTML = header + rows;
+  }
+
+  // ---------- Calendar widget ----------
+
+  var calendarViewDate = new Date();
+
+  function renderCalendar() {
+    var wrap = document.getElementById("dash-calendar");
+    var year = calendarViewDate.getFullYear();
+    var month = calendarViewDate.getMonth();
+    var today = new Date();
+
+    document.getElementById("calendar-month-label").textContent =
+      calendarViewDate.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+
+    var firstDay = new Date(year, month, 1);
+    var startOffset = (firstDay.getDay() + 6) % 7; // Monday-first
+    var daysInMonth = new Date(year, month + 1, 0).getDate();
+    var daysInPrevMonth = new Date(year, month, 0).getDate();
+
+    var dayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+    var html = '<div class="cal-grid">' + dayLabels.map(function (l) { return '<span class="cal-day-label">' + l + '</span>'; }).join("");
+
+    for (var i = 0; i < startOffset; i++) {
+      html += '<span class="cal-cell muted">' + (daysInPrevMonth - startOffset + i + 1) + '</span>';
+    }
+    for (var d = 1; d <= daysInMonth; d++) {
+      var isToday = d === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+      html += '<span class="cal-cell' + (isToday ? " today" : "") + '">' + d + '</span>';
+    }
+    var totalCells = startOffset + daysInMonth;
+    var trailing = (7 - (totalCells % 7)) % 7;
+    for (var t = 1; t <= trailing; t++) {
+      html += '<span class="cal-cell muted">' + t + '</span>';
+    }
+    html += '</div>';
+    wrap.innerHTML = html;
+  }
+
+  // ---------- Quick notes ----------
+
+  function renderNotes() {
+    var wrap = document.getElementById("dash-notes-list");
+    wrap.innerHTML = "";
+    if (state.notes.length === 0) {
+      wrap.innerHTML = '<p class="empty-note">No notes yet.</p>';
+    }
+    state.notes.slice(0, 5).forEach(function (n) {
+      var row = document.createElement("div");
+      row.className = "note-item";
+      var d = new Date(n.created_at || Date.now());
+      row.innerHTML =
+        '<span class="note-text">' + n.text.replace(/</g, "&lt;") + '</span>' +
+        '<span class="note-date">' + d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + '</span>';
+      var removeBtn = document.createElement("button");
+      removeBtn.type = "button";
+      removeBtn.className = "note-remove";
+      removeBtn.innerHTML = "&times;";
+      removeBtn.addEventListener("click", function () { removeNote(n.id); });
+      row.appendChild(removeBtn);
+      wrap.appendChild(row);
+    });
+
+    var addRow = document.createElement("div");
+    addRow.className = "add-note-row";
+    addRow.innerHTML = '<input type="text" placeholder="Add a note…" maxlength="200"><button type="button">Add</button>';
+    var input = addRow.querySelector("input");
+    addRow.querySelector("button").addEventListener("click", function () {
+      if (input.value.trim()) { addNote(input.value.trim()); input.value = ""; }
+    });
+    input.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && input.value.trim()) { addNote(input.value.trim()); input.value = ""; }
+    });
+    wrap.appendChild(addRow);
+  }
+
+  function addNote(text) {
+    var userId = state.session.user.id;
+    supabaseClient.from("notes").insert({ user_id: userId, text: text }).select().single().then(function (res) {
+      if (res.error) { console.error("Axis: add note failed", res.error); return; }
+      state.notes.unshift(res.data);
+      renderNotes();
+    });
+  }
+
+  function removeNote(id) {
+    state.notes = state.notes.filter(function (n) { return n.id !== id; });
+    renderNotes();
+    supabaseClient.from("notes").delete().eq("id", id).then(function (res) {
+      if (res.error) console.error("Axis: remove note failed", res.error);
+    });
   }
 
   var dashRange = "daily";
@@ -865,6 +990,14 @@
         renderDashboardChart();
       });
     });
+    document.getElementById("cal-prev").addEventListener("click", function () {
+      calendarViewDate.setMonth(calendarViewDate.getMonth() - 1);
+      renderCalendar();
+    });
+    document.getElementById("cal-next").addEventListener("click", function () {
+      calendarViewDate.setMonth(calendarViewDate.getMonth() + 1);
+      renderCalendar();
+    });
   }
 
   function renderDashboardChart() {
@@ -874,10 +1007,16 @@
 
   function renderDashboard() {
     renderTopbar();
+    renderDashGreeting();
+    renderDashStats();
+    renderTodayPlan();
     renderDashboardChart();
-    renderTrackerTable();
-    renderTripSummary();
-    renderGoalDonut();
+    renderTaskProgressDonut();
+    renderTemplatesPreview();
+    renderCalendar();
+    renderGoalsPreview();
+    renderHabitsWeekGrid();
+    renderNotes();
   }
 
   // ==================== FINANCIAL ====================
@@ -954,7 +1093,7 @@
         var tgt = parseFloat(targetInput.value) || 0;
         g.current = cur; g.target = tgt;
         updateBar();
-        renderGoalDonut();
+        renderGoalsPreview();
         if (isGuest()) { saveGuestState(); return; }
         supabaseClient.from("goals").update({ current: cur, target: tgt }).eq("id", g.id)
           .then(function (res) { if (res.error) console.error("Axis: goal update failed", res.error); });
@@ -965,7 +1104,7 @@
         var list = category === "financial" ? "financialGoals" : "generalGoals";
         state[list] = state[list].filter(function (x) { return x.id !== g.id; });
         if (category === "financial") renderFinancialGoals(); else renderGeneralGoals();
-        renderGoalDonut();
+        renderGoalsPreview();
         if (isGuest()) { saveGuestState(); return; }
         supabaseClient.from("goals").delete().eq("id", g.id).then(function (res) {
           if (res.error) console.error("Axis: goal remove failed", res.error);
@@ -982,7 +1121,7 @@
       var newGoal = { id: uid(), category: category, name: name.trim(), current: 0, target: parseFloat(target) || 0 };
       if (category === "financial") { state.financialGoals.push(newGoal); renderFinancialGoals(); }
       else { state.generalGoals.push(newGoal); renderGeneralGoals(); }
-      renderGoalDonut();
+      renderGoalsPreview();
       saveGuestState();
       return;
     }
@@ -993,7 +1132,7 @@
         if (res.error) { console.error("Axis: add goal failed", res.error); return; }
         if (category === "financial") { state.financialGoals.push(res.data); renderFinancialGoals(); }
         else { state.generalGoals.push(res.data); renderGeneralGoals(); }
-        renderGoalDonut();
+        renderGoalsPreview();
       });
   }
 
@@ -1130,7 +1269,6 @@
     if (isGuest()) {
       state.trips.push({ id: uid(), name: "New trip" });
       renderTrips();
-      renderTripSummary();
       saveGuestState();
       return;
     }
@@ -1140,7 +1278,6 @@
         if (res.error) { console.error("Axis: add trip failed", res.error); return; }
         state.trips.push(res.data);
         renderTrips();
-        renderTripSummary();
       });
   }
 
@@ -1155,7 +1292,6 @@
   function removeTrip(id) {
     state.trips = state.trips.filter(function (t) { return t.id !== id; });
     renderTrips();
-    renderTripSummary();
     if (isGuest()) { saveGuestState(); return; }
     supabaseClient.from("trips").delete().eq("id", id).then(function (res) {
       if (res.error) console.error("Axis: remove trip failed", res.error);
@@ -1194,7 +1330,6 @@
           trip.start_date = startI.value; trip.end_date = endI.value;
           trip.budget = parseFloat(budgetI.value) || 0; trip.notes = notesI.value;
           persistTrip(trip);
-          renderTripSummary();
         });
       });
 
@@ -1535,6 +1670,29 @@
 
   // ==================== AI COACH ====================
 
+  function sendCoachMessage(text, addMessageFn) {
+    if (!text.trim()) return;
+    if (isGuest()) { openAuthGate("ai"); return; }
+
+    addMessageFn(text, "user");
+
+    var context = {
+      dailyHabits: dailyHabits().map(function (h) { return { name: h.name, doneToday: isDone(h.id, 0), streak: habitStreak(h.id) }; }),
+      financial: state.financial
+    };
+
+    fetch("/api/coach", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, context: context })
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (data) { addMessageFn(data.reply || "Sorry, I couldn't generate a response.", "assistant"); })
+      .catch(function () {
+        addMessageFn("The coach isn't connected yet — deploy /api/coach.js to Vercel with a GEMINI_API_KEY to enable this.", "assistant");
+      });
+  }
+
   function initCoach() {
     var toggle = document.getElementById("coach-toggle");
     var panel = document.getElementById("coach-panel");
@@ -1558,27 +1716,28 @@
       e.preventDefault();
       var text = input.value.trim();
       if (!text) return;
-
-      if (isGuest()) { openAuthGate("ai"); return; }
-
-      addMessage(text, "user");
       input.value = "";
+      sendCoachMessage(text, addMessage);
+    });
 
-      var context = {
-        dailyHabits: dailyHabits().map(function (h) { return { name: h.name, doneToday: isDone(h.id, 0), streak: habitStreak(h.id) }; }),
-        financial: state.financial
-      };
-
-      fetch("/api/coach", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text, context: context })
-      })
-        .then(function (res) { return res.json(); })
-        .then(function (data) { addMessage(data.reply || "Sorry, I couldn't generate a response.", "assistant"); })
-        .catch(function () {
-          addMessage("The coach isn't connected yet — deploy /api/coach.js to Vercel with a GEMINI_API_KEY to enable this.", "assistant");
-        });
+    // Dashboard inline AI card — same coach, different entry point.
+    var dashForm = document.getElementById("dash-ai-form");
+    var dashInput = document.getElementById("dash-ai-input");
+    if (dashForm) {
+      dashForm.addEventListener("submit", function (e) {
+        e.preventDefault();
+        var text = dashInput.value.trim();
+        if (!text) return;
+        dashInput.value = "";
+        panel.classList.remove("hidden");
+        sendCoachMessage(text, addMessage);
+      });
+    }
+    document.querySelectorAll(".ai-chip").forEach(function (chip) {
+      chip.addEventListener("click", function () {
+        panel.classList.remove("hidden");
+        sendCoachMessage(chip.getAttribute("data-prompt"), addMessage);
+      });
     });
   }
 
@@ -1677,6 +1836,21 @@
 
   // ==================== INIT ====================
 
+  function hideBootSkeleton() {
+    var el = document.getElementById("boot-skeleton");
+    if (el) el.classList.add("hidden");
+  }
+
+  function enterApp() {
+    document.getElementById("auth-gate").classList.add("hidden");
+    document.getElementById("app-shell").classList.remove("hidden");
+  }
+
+  function exitToAuth() {
+    document.getElementById("app-shell").classList.add("hidden");
+    document.getElementById("auth-gate").classList.remove("hidden");
+  }
+
   document.addEventListener("DOMContentLoaded", function () {
     var initializers = [
       initAuthGate, initResetFlow, initNav, initTheme, initFinancialCalculator,
@@ -1686,24 +1860,30 @@
       try { fn(); } catch (e) { console.error("Axis: " + fn.name + " failed to init", e); }
     });
 
-    // Guest-first: render local data immediately so the app is usable with no account.
-    loadGuestData();
-
     supabaseClient.auth.onAuthStateChange(function (event, session) {
       state.session = session;
       if (session) {
+        enterApp();
         loadAllData().then(function () {
           if (pendingOnboarding && !state.onboardingCompleted) {
             pendingOnboarding = false;
             startOnboarding();
           }
         });
+      } else {
+        exitToAuth();
       }
     });
 
     supabaseClient.auth.getSession().then(function (res) {
       state.session = res.data.session;
-      if (state.session) { loadAllData(); }
+      hideBootSkeleton();
+      if (state.session) {
+        enterApp();
+        loadAllData();
+      } else {
+        exitToAuth();
+      }
     });
   });
 })();
