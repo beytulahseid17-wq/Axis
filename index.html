@@ -6,9 +6,9 @@
 <title>Axis Planner</title>
 <meta name="description" content="Daily habits, financial tracking, trips, and goals in one dashboard.">
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#F8F7F2">
-<link rel="apple-touch-icon" href="icon-192.png">
-<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#FFFFFF">
+<link rel="apple-touch-icon" href="https://beytulahseid17-wq.github.io/Axis/icon-512.png">
+<link rel="icon" href="https://beytulahseid17-wq.github.io/Axis/icon-512.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
@@ -17,8 +17,14 @@
 </head>
 <body>
 
+<div id="boot-skeleton" class="boot-skeleton">
+  <img src="https://beytulahseid17-wq.github.io/Axis/icon-512.png" alt="" class="boot-logo">
+  <div class="boot-bar"><div class="boot-bar-fill"></div></div>
+</div>
+
+
 <!-- ========== Sign-up gate modal (shown only for protected features) ========== -->
-<div id="auth-gate" class="auth-gate hidden">
+<div id="auth-gate" class="auth-gate">
   <div class="auth-gate-card">
     <div class="auth-gate-illo">
       <svg viewBox="0 0 200 160" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -60,8 +66,7 @@
     <p id="gate-error" class="auth-error hidden"></p>
     <p id="gate-success" class="auth-success hidden"></p>
     <button type="button" id="gate-toggle" class="text-btn">Already have an account? Log in</button>
-    <button type="button" id="auth-gate-close" class="auth-gate-dismiss">Maybe later</button>
-  </div>
+    </div>
 </div>
 
 <!-- Forgot / reset password modal -->
@@ -106,7 +111,7 @@
 </div>
 
 <!-- ========== App (always visible) ========== -->
-<div id="app-shell" class="app-shell">
+<div id="app-shell" class="app-shell hidden">
 
   <!-- Top-right cluster: streak, coins, profile FAB -->
   <div class="topright-cluster">
@@ -124,7 +129,7 @@
   </div>
 
   <aside class="sidebar">
-    <div class="wordmark">Axis <span>Planner</span></div>
+    <div class="wordmark"><img src="https://beytulahseid17-wq.github.io/Axis/icon-512.png" alt="" class="wordmark-icon">Axis <span>Planner</span></div>
     <button type="button" id="install-btn" class="install-btn hidden">Install app</button>
     <nav class="side-nav" id="side-nav-full">
       <button class="nav-item active" data-page="home">
@@ -176,32 +181,144 @@
 
       <!-- Dashboard -->
       <section data-page="dashboard" class="page hidden">
-        <h1>Dashboard</h1>
-        <p class="page-meta" id="dash-user-email"></p>
-        <div class="module animate-in" style="margin-top:1.25rem;">
-          <div class="progress-header">
-            <span class="progress-title">Analytics</span>
-            <div class="analytics-toggle">
-              <button type="button" class="toggle-btn active" data-range="daily">Daily</button>
-              <button type="button" class="toggle-btn" data-range="weekly">Weekly</button>
+        <div class="dash-header">
+          <h1 id="dash-greeting">Good morning!</h1>
+          <p class="sub">Small steps every day, big change one day.</p>
+        </div>
+
+        <div class="dash-stats-row animate-in">
+          <div class="dash-stat-card">
+            <p class="dash-stat-label">Focus Score</p>
+            <p class="dash-stat-value" id="stat-focus-score">0%</p>
+            <p class="dash-stat-trend" id="stat-focus-trend"></p>
+          </div>
+          <div class="dash-stat-card dash-stat-ring">
+            <div>
+              <p class="dash-stat-label">Tasks Today</p>
+              <p class="dash-stat-value" id="stat-tasks-today">0/0</p>
+              <p class="dash-stat-trend" id="stat-tasks-pct"></p>
             </div>
+            <div class="mini-ring" id="stat-tasks-ring"></div>
           </div>
-          <div id="dash-chart"></div>
-        </div>
-        <div class="module animate-in" style="margin-top:1rem;">
-          <p class="module-title">Daily Tracker</p>
-          <div class="tracker-table-wrap"><table class="tracker-table" id="tracker-table"></table></div>
-        </div>
-        <div class="dash-grid">
-          <div class="module trip-summary-card">
-            <p class="module-title">Next Trip Plan</p>
-            <div id="dash-trip-summary"></div>
+          <div class="dash-stat-card">
+            <p class="dash-stat-label">Current Streak</p>
+            <div class="dash-stat-value-row">
+              <span class="dash-stat-value" id="stat-streak">0</span>
+              <svg class="streak-flame-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
+            </div>
+            <p class="dash-stat-trend">days</p>
           </div>
-          <div class="module" style="text-align:center;">
-            <p class="module-title">Consistency</p>
-            <div class="donut-wrap">
-              <div class="donut" id="dash-donut"><span class="donut-value" id="dash-donut-value">0%</span></div>
-              <span class="donut-label">Consistent</span>
+          <div class="dash-stat-card">
+            <p class="dash-stat-label">Axis Coins</p>
+            <div class="dash-stat-value-row">
+              <span class="dash-stat-value" id="stat-coins">0</span>
+              <span class="coin-badge-icon">S</span>
+            </div>
+            <p class="dash-stat-trend" id="stat-coins-trend"></p>
+          </div>
+        </div>
+
+        <div class="dash-two-col">
+          <div class="dash-main-col">
+
+            <div class="module animate-in">
+              <div class="progress-header">
+                <span class="progress-title">Today's Plan</span>
+                <button type="button" class="ghost-btn-sm" data-page-link="daily">View All</button>
+              </div>
+              <div id="dash-today-plan"></div>
+            </div>
+
+            <div class="dash-charts-row animate-in">
+              <div class="module">
+                <div class="progress-header">
+                  <span class="progress-title">Weekly Progress</span>
+                  <div class="analytics-toggle">
+                    <button type="button" class="toggle-btn active" data-range="daily">Daily</button>
+                    <button type="button" class="toggle-btn" data-range="weekly">Weekly</button>
+                  </div>
+                </div>
+                <div id="dash-chart"></div>
+              </div>
+              <div class="module" style="text-align:center;">
+                <p class="module-title">Task Progress</p>
+                <div class="donut-wrap">
+                  <div class="donut" id="dash-donut"><span class="donut-value" id="dash-donut-value">0%</span></div>
+                  <span class="donut-label" id="dash-donut-label">Completed</span>
+                </div>
+                <div class="donut-legend" id="dash-donut-legend"></div>
+              </div>
+            </div>
+
+            <div class="module animate-in">
+              <div class="progress-header">
+                <span class="progress-title">Templates</span>
+                <button type="button" class="ghost-btn-sm" data-page-link="templates">View All</button>
+              </div>
+              <div id="dash-templates-preview" class="templates-preview-row"></div>
+            </div>
+
+            <div class="module animate-in ai-inline-card">
+              <div class="ai-inline-header">
+                <div class="ai-inline-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <div>
+                  <p class="ai-inline-title">Axis AI Assistant</p>
+                  <p class="ai-inline-sub" id="ai-inline-greeting">How can I help you be more productive today?</p>
+                </div>
+              </div>
+              <div class="ai-chip-row">
+                <button type="button" class="ai-chip" data-prompt="Plan my day">Plan my day</button>
+                <button type="button" class="ai-chip" data-prompt="Generate a task list for me">Generate task list</button>
+                <button type="button" class="ai-chip" data-prompt="Give me a focus timer suggestion">Focus timer</button>
+                <button type="button" class="ai-chip" data-prompt="Analyze my progress this week">Analyze my progress</button>
+              </div>
+              <form id="dash-ai-form" class="dash-ai-form">
+                <input type="text" id="dash-ai-input" placeholder="Ask me anything…">
+                <button type="submit" aria-label="Send">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </button>
+              </form>
+            </div>
+
+          </div>
+
+          <div class="dash-side-col">
+            <div class="module animate-in">
+              <div class="progress-header">
+                <span class="progress-title">Calendar</span>
+                <div class="cal-nav">
+                  <span class="tiny-note" id="calendar-month-label"></span>
+                  <button type="button" id="cal-prev" class="cal-nav-btn" aria-label="Previous month">&#8249;</button>
+                  <button type="button" id="cal-next" class="cal-nav-btn" aria-label="Next month">&#8250;</button>
+                </div>
+              </div>
+              <div id="dash-calendar" class="dash-calendar"></div>
+            </div>
+
+            <div class="module animate-in">
+              <div class="progress-header">
+                <span class="progress-title">Goals</span>
+                <button type="button" class="ghost-btn-sm" data-page-link="goals">View All</button>
+              </div>
+              <div id="dash-goals-preview"></div>
+            </div>
+
+            <div class="module animate-in">
+              <div class="progress-header">
+                <span class="progress-title">Habits</span>
+                <button type="button" class="ghost-btn-sm" data-page-link="daily">View All</button>
+              </div>
+              <div id="dash-habits-grid" class="habits-week-grid"></div>
+            </div>
+
+            <div class="module animate-in">
+              <div class="progress-header">
+                <span class="progress-title">Quick Notes</span>
+                <button type="button" class="ghost-btn-sm" id="add-note-btn">+</button>
+              </div>
+              <div id="dash-notes-list"></div>
             </div>
           </div>
         </div>
