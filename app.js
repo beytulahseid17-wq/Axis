@@ -3,7 +3,7 @@
 
   var supabaseClient = null;
   try {
-    supabaseClient = window.supabase.createClient("https://jcfqjltjnkocjmctnsth.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZnFqbHRqbmtvY2ptY3Ruc3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMTUwNTEsImV4cCI6MjA5OTU5MTA1MX0.t2U8GsWpm8J3HMj6nmFIwv5RA2dhaRrLo8YdcMnVP7M");
+    supabaseClient = window.supabase.createClient( "https://jcfqjltjnkocjmctnsth.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZnFqbHRqbmtvY2ptY3Ruc3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMTUwNTEsImV4cCI6MjA5OTU5MTA1MX0.t2U8GsWpm8J3HMj6nmFIwv5RA2dhaRrLo8YdcMnVP7M");
   } catch (e) {
     console.error("Axis: failed to create Supabase client — check config.js", e);
   }
@@ -79,21 +79,6 @@
     { name: "Deep Focus", desc: "Protect a block of real, undistracted work.", items: ["No phone for first hour", "One 90-minute focus block", "Review tomorrow's top task"] },
     { name: "Faith & Reflection", desc: "Small consistent spiritual habits.", items: ["5 minutes of quiet reflection", "Read something meaningful", "One act of kindness"] },
     { name: "Evening Reset", desc: "Close the day with intention.", items: ["Tidy your workspace", "Plan tomorrow", "Screens off 30 min before bed"] }
-  ];
-
-  var QUICKLINKS = [
-    { page: "daily", title: "Daily", sub: "View all tasks", icon: 'rect x="3" y="4" width="18" height="18" rx="2"' },
-    { page: "analytics", title: "Analytics", sub: "Track your growth", icon: 'circle cx="12" cy="12" r="9"' },
-    { page: "financial", title: "Finance", sub: "Manage finance", icon: 'path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" fill="none"' },
-    { page: "goals", title: "Goal", sub: "Set your targets", icon: 'circle cx="12" cy="12" r="9"' },
-    { page: "trip", title: "Trip Plan", sub: "Plan your trips", icon: 'circle cx="12" cy="10" r="3"' },
-    { page: "templates", title: "Templates", sub: "Ready-made sets", icon: 'path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"' }
-  ];
-
-  var RECOMMENDED = [
-    { title: "Templates", sub: "Start with a ready-made set", page: "templates" },
-    { title: "Goals", sub: "Set a target to work toward", page: "goals" },
-    { title: "Trip Plan", sub: "Plan your next trip", page: "trip" }
   ];
 
   function dateStr(offsetDays) {
@@ -416,6 +401,7 @@
 
   function updateAdRail() {
     var rail = document.getElementById("ad-rail");
+    if (!rail) return;
     var shouldShow = state.plan !== "premium" && navigator.onLine;
     rail.classList.toggle("hidden", !shouldShow);
   }
@@ -566,7 +552,7 @@
     if (isGuest()) {
       state.habits.push({ id: uid(), dimension: "daily", name: name.trim() });
       saveGuestState();
-      renderDaily(); renderHome(); renderDashboard(); renderTemplatesTab();
+      renderDaily(); renderDashboard(); renderTemplatesTab();
       return;
     }
     var userId = state.session.user.id;
@@ -575,13 +561,13 @@
       .then(function (res) {
         if (res.error) { console.error("Axis: add habit failed", res.error); return; }
         state.habits.push(res.data);
-        renderDaily(); renderHome(); renderDashboard(); renderTemplatesTab();
+        renderDaily(); renderDashboard(); renderTemplatesTab();
       });
   }
 
   function removeHabit(habitId) {
     state.habits = state.habits.filter(function (h) { return h.id !== habitId; });
-    renderDaily(); renderHome(); renderDashboard();
+    renderDaily(); renderDashboard();
     if (isGuest()) { saveGuestState(); return; }
     supabaseClient.from("habits").delete().eq("id", habitId).then(function (res) {
       if (res.error) console.error("Axis: remove habit failed", res.error);
@@ -597,7 +583,7 @@
     else state.entriesByHabit[habitId][today] = true;
 
     adjustCoins(currentlyDone ? -1 : 1);
-    renderDaily(); renderHome(); renderDashboard(); renderAnalytics(); renderTopbar();
+    renderDaily(); renderDashboard(); renderAnalytics(); renderTopbar();
 
     if (isGuest()) { saveGuestState(); return; }
 
@@ -662,56 +648,6 @@
   }
 
   // ==================== HOME ====================
-
-  function renderHome() {
-    var habits = dailyHabits();
-    var doneCount = habits.filter(function (h) { return isDone(h.id, 0); }).length;
-
-    document.getElementById("home-progress-count").textContent = doneCount + "/" + habits.length;
-    var pct = habits.length ? (doneCount / habits.length) * 100 : 0;
-    document.getElementById("home-progress-fill").style.width = pct + "%";
-
-    var listWrap = document.getElementById("home-daily-list");
-    listWrap.innerHTML = "";
-    listWrap.appendChild(buildHabitListEl(habits));
-    listWrap.appendChild(buildAddRow(addHabit, "Add task"));
-
-    var grid = document.getElementById("quicklink-grid");
-    grid.innerHTML = "";
-    QUICKLINKS.forEach(function (q) {
-      var card = document.createElement("button");
-      card.type = "button";
-      card.className = "quicklink-card";
-      card.setAttribute("data-page-link", q.page);
-      card.innerHTML =
-        '<div class="quicklink-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' + q.icon + '</svg></div>' +
-        '<span class="quicklink-title">' + q.title + '</span>' +
-        '<span class="quicklink-sub">' + q.sub + '</span>';
-      grid.appendChild(card);
-    });
-    // re-bind since these are newly created
-    grid.querySelectorAll("[data-page-link]").forEach(function (el) {
-      el.addEventListener("click", function () { goToPage(el.getAttribute("data-page-link")); });
-    });
-  }
-
-  function renderRecommended() {
-    var wrap = document.getElementById("recommended-list");
-    wrap.innerHTML = "";
-    RECOMMENDED.forEach(function (r) {
-      var btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "recommended-item";
-      btn.setAttribute("data-page-link", r.page);
-      btn.innerHTML =
-        '<span class="recommended-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg></span>' +
-        '<span><span class="recommended-title">' + r.title + '</span><br><span class="recommended-sub">' + r.sub + '</span></span>';
-      wrap.appendChild(btn);
-    });
-    wrap.querySelectorAll("[data-page-link]").forEach(function (el) {
-      el.addEventListener("click", function () { goToPage(el.getAttribute("data-page-link")); });
-    });
-  }
 
   // ==================== DASHBOARD ====================
 
@@ -1799,8 +1735,7 @@
 
   function renderAll() {
     renderTopbar();
-    renderHome();
-    renderRecommended();
+   
     renderDaily();
     renderDashboard();
     renderFinancial();
