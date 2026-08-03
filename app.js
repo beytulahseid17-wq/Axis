@@ -368,6 +368,8 @@
       el.addEventListener("click", function (e) {
         e.preventDefault();
         goToPage(el.getAttribute("data-page"));
+        var menu = document.getElementById("dash-dropdown-menu");
+        if (menu) menu.classList.add("hidden");
       });
     });
     document.querySelectorAll("[data-page-link]").forEach(function (el) {
@@ -378,6 +380,34 @@
     });
     var profileFab = document.getElementById("profile-fab");
     if (profileFab) profileFab.addEventListener("click", function () { goToPage("profile"); });
+
+    var dropdownBtn = document.getElementById("dash-dropdown-btn");
+    var dropdownMenu = document.getElementById("dash-dropdown-menu");
+    if (dropdownBtn && dropdownMenu) {
+      dropdownBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        dropdownMenu.classList.toggle("hidden");
+      });
+      document.addEventListener("click", function (e) {
+        if (!dropdownMenu.classList.contains("hidden") && !dropdownMenu.contains(e.target) && e.target !== dropdownBtn) {
+          dropdownMenu.classList.add("hidden");
+        }
+      });
+    }
+
+    var quickNoteBtn = document.getElementById("quick-note-btn");
+    if (quickNoteBtn) {
+      quickNoteBtn.addEventListener("click", function () {
+        var notesList = document.getElementById("dash-notes-list");
+        if (!notesList) return;
+        notesList.scrollIntoView({ behavior: "smooth", block: "center" });
+        var input = notesList.querySelector(".add-note-row input");
+        if (input) setTimeout(function () { input.focus(); }, 350);
+      });
+    }
+
+    var dashProfileBtn = document.getElementById("dash-profile-btn");
+    if (dashProfileBtn) dashProfileBtn.addEventListener("click", function () { goToPage("profile"); });
   }
 
   // ==================== THEME ====================
@@ -716,6 +746,60 @@
     document.getElementById("dash-donut-label").textContent = "Momentum";
   }
 
+  function renderDesktopStats() {
+    var habits = dailyHabits();
+    var doneCount = habits.filter(function (h) { return isDone(h.id, 0); }).length;
+    var todayPct = habits.length ? Math.round((doneCount / habits.length) * 100) : 0;
+    var yesterdayPct = Math.round(dayCompletionPct(1));
+    var diff = todayPct - yesterdayPct;
+
+    var focusEl = document.getElementById("stat-focus-score");
+    if (!focusEl) return;
+    focusEl.textContent = todayPct + "%";
+    var trendEl = document.getElementById("stat-focus-trend");
+    if (habits.length === 0) { trendEl.textContent = ""; }
+    else {
+      trendEl.textContent = (diff >= 0 ? "↑ " : "↓ ") + Math.abs(diff) + "% from yesterday";
+      trendEl.style.color = diff >= 0 ? "var(--accent)" : "var(--physical)";
+    }
+
+    document.getElementById("stat-tasks-today").textContent = doneCount + "/" + habits.length;
+    document.getElementById("stat-tasks-pct").textContent = todayPct + "% momentum";
+    document.getElementById("stat-tasks-ring").style.background =
+      "conic-gradient(var(--accent) " + todayPct + "%, var(--surface-2) " + todayPct + "%)";
+
+    // desktop's paired Task Progress donut (separate element from the mobile "Your Focus" donut)
+    var donut2 = document.getElementById("dash-donut-2");
+    if (donut2) {
+      var pendingPct = 100 - todayPct;
+      donut2.style.background = "conic-gradient(var(--accent) " + todayPct + "%, var(--surface-2) " + todayPct + "%)";
+      document.getElementById("dash-donut-value-2").textContent = todayPct + "%";
+      var legend = document.getElementById("dash-donut-legend");
+      if (legend) {
+        legend.innerHTML =
+          '<div class="donut-legend-row"><span><span class="donut-legend-dot" style="background:var(--accent);"></span>Completed</span><span>' + todayPct + '%</span></div>' +
+          '<div class="donut-legend-row"><span><span class="donut-legend-dot" style="background:var(--surface-2);border:1px solid var(--line);"></span>Pending</span><span>' + pendingPct + '%</span></div>';
+      }
+    }
+  }
+
+  function renderGoalsPreview() {
+    var wrap = document.getElementById("dash-goals-preview");
+    if (!wrap) return;
+    var goals = state.financialGoals.concat(state.generalGoals).slice(0, 3);
+    if (goals.length === 0) {
+      wrap.innerHTML = '<p class="empty-note">No goals yet.</p>';
+      return;
+    }
+    wrap.innerHTML = goals.map(function (g) {
+      var pct = g.target > 0 ? Math.min(Math.round((g.current / g.target) * 100), 100) : 0;
+      return '<div style="margin-bottom:0.9rem;">' +
+        '<div style="display:flex;justify-content:space-between;font-size:0.8rem;margin-bottom:0.35rem;"><span>' + g.name + '</span><span style="color:var(--text-muted);">' + pct + '%</span></div>' +
+        '<div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--accent);"></div></div>' +
+        '</div>';
+    }).join("");
+  }
+
   function renderDashGreeting() {
     var hour = new Date().getHours();
     var timeGreeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -914,8 +998,9 @@
     renderTopbar();
     renderDashGreeting();
     renderYourFocus();
+    renderDesktopStats();
     renderTodayPlan();
-    renderGoalsCards();
+    renderGoalsCards(); renderGoalsPreview();
     renderDashboardChart();
     renderTemplatesPreview();
     renderCalendar();
@@ -997,7 +1082,7 @@
         var tgt = parseFloat(targetInput.value) || 0;
         g.current = cur; g.target = tgt;
         updateBar();
-        renderGoalsCards();
+        renderGoalsCards(); renderGoalsPreview();
         if (isGuest()) { saveGuestState(); return; }
         supabaseClient.from("goals").update({ current: cur, target: tgt }).eq("id", g.id)
           .then(function (res) { if (res.error) console.error("Axis: goal update failed", res.error); });
@@ -1008,7 +1093,7 @@
         var list = category === "financial" ? "financialGoals" : "generalGoals";
         state[list] = state[list].filter(function (x) { return x.id !== g.id; });
         if (category === "financial") renderFinancialGoals(); else renderGeneralGoals();
-        renderGoalsCards();
+        renderGoalsCards(); renderGoalsPreview();
         if (isGuest()) { saveGuestState(); return; }
         supabaseClient.from("goals").delete().eq("id", g.id).then(function (res) {
           if (res.error) console.error("Axis: goal remove failed", res.error);
@@ -1025,7 +1110,7 @@
       var newGoal = { id: uid(), category: category, name: name.trim(), current: 0, target: parseFloat(target) || 0 };
       if (category === "financial") { state.financialGoals.push(newGoal); renderFinancialGoals(); }
       else { state.generalGoals.push(newGoal); renderGeneralGoals(); }
-      renderGoalsCards();
+      renderGoalsCards(); renderGoalsPreview();
       saveGuestState();
       return;
     }
@@ -1036,7 +1121,7 @@
         if (res.error) { console.error("Axis: add goal failed", res.error); return; }
         if (category === "financial") { state.financialGoals.push(res.data); renderFinancialGoals(); }
         else { state.generalGoals.push(res.data); renderGeneralGoals(); }
-        renderGoalsCards();
+        renderGoalsCards(); renderGoalsPreview();
       });
   }
 
@@ -1655,6 +1740,8 @@
       : "G";
     var fabEl = document.getElementById("profile-fab-initial");
     if (fabEl) fabEl.textContent = initial;
+    var dashFabEl = document.getElementById("dash-profile-initial");
+    if (dashFabEl) dashFabEl.textContent = initial;
     var avatarEl = document.getElementById("profile-page-avatar");
     if (avatarEl) {
       if (isLoggedIn && state.avatarUrl) {
