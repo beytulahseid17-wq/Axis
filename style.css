@@ -889,14 +889,6 @@ h1, h2, h3 {
   .main-area { padding: 1rem 1rem 6.5rem; }
 
   .quicklink-grid { grid-template-columns: repeat(2, 1fr); }
-
-  .coach-toggle {
-    bottom: 0.9rem;
-    right: 0.9rem;
-    width: 46px;
-    height: 46px;
-    z-index: 31;
-  }
   .coach-panel { bottom: 8.5rem; right: 0.75rem; }
 
   .bottom-nav {
@@ -2236,30 +2228,6 @@ h1, h2, h3 {
   pointer-events: none;
 }
 
-/* ============ Today on the way — numbered rows ============ */
-
-#dash-today-plan .habit-list { counter-reset: today-plan; }
-#dash-today-plan .habit-row { counter-increment: today-plan; padding-left: 2.1rem; position: relative; }
-
-#dash-today-plan .habit-row::before {
-  content: counter(today-plan);
-  position: absolute;
-  left: 0;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 /* ============ Goals as cards (matching Projects in reference image) ============ */
 
 .goals-cards-row {
@@ -2336,3 +2304,114 @@ h1, h2, h3 {
 }
 
 .goal-card-add-label { font-size: 0.78rem; text-align: center; }
+
+/* ============ Desktop-only / mobile-only toggles ============ */
+
+.mobile-only { display: none; }
+.desktop-only { display: block; }
+
+@media (max-width: 860px) {
+  .desktop-only { display: none !important; }
+  .mobile-only { display: block; }
+  .mobile-only.dash-stat-card,
+  .goals-cards-row.mobile-only { display: grid; }
+}
+
+/* numbered "Today on the way" rows only apply on mobile */
+#dash-today-plan .habit-row::before { content: none; }
+#dash-today-plan .habit-row { padding-left: 0; }
+
+@media (max-width: 860px) {
+  #dash-today-plan .habit-list { counter-reset: today-plan; }
+  #dash-today-plan .habit-row { counter-increment: today-plan; padding-left: 2.1rem; position: relative; }
+  #dash-today-plan .habit-row::before {
+    content: counter(today-plan);
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+/* ============ Dashboard mobile top bar ============ */
+
+.dash-mobile-topbar {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.dash-circle-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.dash-topbar-right { display: flex; gap: 0.6rem; }
+
+.dash-dropdown-wrap { position: relative; }
+
+.dash-dropdown-menu {
+  position: absolute;
+  top: 48px;
+  left: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(0,0,0,0.14);
+  padding: 0.4rem;
+  min-width: 170px;
+  z-index: 35;
+}
+
+.dash-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 0.85rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 9px;
+  cursor: pointer;
+}
+
+.dash-dropdown-item:hover { background: var(--surface-2); }
+
+@media (max-width: 860px) {
+  .dash-mobile-topbar { display: flex; }
+  .topright-cluster { display: none; }
+
+  .coach-toggle {
+    bottom: 0.9rem;
+    right: 0.9rem;
+    width: 58px;
+    height: 58px;
+  }
+}
