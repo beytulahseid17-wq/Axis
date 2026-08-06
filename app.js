@@ -3,7 +3,7 @@
 
   var supabaseClient = null;
   try {
-    supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    supabaseClient = window.supabase.createClient("https://jcfqjltjnkocjmctnsth.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZnFqbHRqbmtvY2ptY3Ruc3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMTUwNTEsImV4cCI6MjA5OTU5MTA1MX0.t2U8GsWpm8J3HMj6nmFIwv5RA2dhaRrLo8YdcMnVP7M");
   } catch (e) {
     console.error("Axis: failed to create Supabase client — check config.js", e);
   }
@@ -361,6 +361,23 @@
       el.classList.toggle("active", el.getAttribute("data-page") === pageId);
     });
     window.scrollTo(0, 0);
+  }
+
+  function initStickyDashTopbar() {
+    var bar = document.getElementById("dash-mobile-topbar");
+    if (!bar) return;
+    var ticking = false;
+    function update() {
+      bar.classList.toggle("scrolled", window.scrollY > 4);
+      ticking = false;
+    }
+    window.addEventListener("scroll", function () {
+      if (!ticking) {
+        requestAnimationFrame(update);
+        ticking = true;
+      }
+    }, { passive: true });
+    update();
   }
 
   function initNav() {
@@ -1849,7 +1866,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     var initializers = [
       initAuthGate, initResetFlow, initNav, initTheme, initFinancialCalculator,
-      initDashboardToggle, initSettings, initCoach, initChestModal, initProfile
+      initDashboardToggle, initSettings, initCoach, initChestModal, initProfile, initStickyDashTopbar
     ];
     initializers.forEach(function (fn) {
       try { fn(); } catch (e) { console.error("Axis: " + fn.name + " failed to init", e); }
