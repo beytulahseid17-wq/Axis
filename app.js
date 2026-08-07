@@ -24,6 +24,7 @@
   }
 
   var GUEST_KEY = "axis-guest-data";
+  var currentProjectId = null;
   var pendingOnboarding = false;
 
   function uid() {
@@ -71,7 +72,9 @@
     financialGoals: [],
     generalGoals: [],
     trips: [],
-    notes: []
+    notes: [],
+    projects: [],
+    reusableBlocks: []
   };
 
   var TEMPLATES = [
@@ -533,13 +536,15 @@
       supabaseClient.from("transactions").select("*").eq("user_id", userId).order("entry_date", { ascending: false }).limit(30),
       supabaseClient.from("goals").select("*").eq("user_id", userId).order("created_at"),
       supabaseClient.from("trips").select("*").eq("user_id", userId).order("created_at"),
-      supabaseClient.from("notes").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(10)
+      supabaseClient.from("notes").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(10),
+      supabaseClient.from("projects").select("*").eq("user_id", userId).order("created_at"),
+      supabaseClient.from("reusable_blocks").select("*").eq("user_id", userId).order("created_at", { ascending: false })
     ];
 
     return Promise.all(calls).then(function (results) {
       var profileRes = results[0], habitsRes = results[1], entriesRes = results[2],
           finRes = results[3], txRes = results[4], goalsRes = results[5], tripsRes = results[6],
-          notesRes = results[7];
+          notesRes = results[7], projectsRes = results[8], reusableRes = results[9];
 
       if (profileRes.data) {
         state.plan = profileRes.data.plan || "free";
@@ -567,6 +572,10 @@
       state.trips = tripsRes.data || [];
       if (notesRes.error) console.error("Axis: notes fetch failed", notesRes.error);
       state.notes = notesRes.data || [];
+      if (projectsRes.error) console.error("Axis: projects fetch failed", projectsRes.error);
+      state.projects = projectsRes.data || [];
+      if (reusableRes.error) console.error("Axis: reusable blocks fetch failed", reusableRes.error);
+      state.reusableBlocks = reusableRes.data || [];
 
       updateAdRail();
       updateCoinDisplay();
@@ -982,6 +991,331 @@
     renderNotes();
     supabaseClient.from("notes").delete().eq("id", id).then(function (res) {
       if (res.error) console.error("Axis: remove note failed", res.error);
+    });
+  }
+
+  // ==================== PROJECTS (blocks, Notion-style) ====================
+
+  function currentProject() {
+    return state.projects.filter(function (p) { return p.id === currentProjectId; })[0];
+  }
+
+  function projectProgress(project) {
+    var total = 0, done = 0;
+    (project.content || []).forEach(function (b) {
+      if (b.type === "checklist") {
+        (b.items || []).forEach(function (it) { total++; if (it.checked) done++; });
+      }
+    });
+    return total > 0 ? Math.round((done / total) * 100) : 0;
+  }
+
+  function renderProjectsList() {
+    var grid = document.getElementById("projects-grid");
+    if (!grid) return;
+    if (state.projects.length === 0) {
+      grid.innerHTML = '<p class="empty-note">No projects yet — create your first one.</p>';
+      return;
+    }
+    grid.innerHTML = "";
+    state.projects.forEach(function (p) {
+      var pct = projectProgress(p);
+      var card = document.createElement("div");
+      card.className = "project-card";
+      card.innerHTML =
+        '<button type="button" class="project-card-remove" data-id="' + p.id + '">&times;</button>' +
+        '<div class="project-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>' +
+        '<p class="project-card-name">' + (p.name || "Untitled project") + '</p>' +
+        '<p class="project-card-sub">' + (p.subtitle || "No description yet") + '</p>' +
+        '<div class="project-card-progress-row"><div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--accent);"></div></div><span class="project-card-progress-pct">' + pct + '%</span></div>';
+      card.addEventListener("click", function (e) {
+        if (e.target.closest(".project-card-remove")) return;
+        openProjectDetail(p.id);
+      });
+      card.querySelector(".project-card-remove").addEventListener("click", function (e) {
+        e.stopPropagation();
+        removeProject(p.id);
+      });
+      grid.appendChild(card);
+    });
+  }
+
+  function addProject() {
+    if (isGuest()) { openAuthGate("settings"); return; }
+    var userId = state.session.user.id;
+    supabaseClient.from("projects").insert({ user_id: userId, name: "New Project", subtitle: "", content: [] })
+      .select().single().then(function (res) {
+        if (res.error) { console.error("Axis: add project failed", res.error); return; }
+        state.projects.push(res.data);
+        renderProjectsList();
+        openProjectDetail(res.data.id);
+      });
+  }
+
+  function removeProject(id) {
+    state.projects = state.projects.filter(function (p) { return p.id !== id; });
+    renderProjectsList();
+    supabaseClient.from("projects").delete().eq("id", id).then(function (res) {
+      if (res.error) console.error("Axis: remove project failed", res.error);
+    });
+  }
+
+  var saveProjectTimer = null;
+  function saveCurrentProject() {
+    var project = currentProject();
+    if (!project) return;
+    clearTimeout(saveProjectTimer);
+    saveProjectTimer = setTimeout(function () {
+      supabaseClient.from("projects").update({ name: project.name, subtitle: project.subtitle, content: project.content })
+        .eq("id", project.id).then(function (res) {
+          if (res.error) console.error("Axis: save project failed", res.error);
+        });
+    }, 500);
+  }
+
+  function openProjectDetail(id) {
+    currentProjectId = id;
+    document.getElementById("projects-list-view").classList.add("hidden");
+    document.getElementById("project-detail-view").classList.remove("hidden");
+    var project = currentProject();
+    if (!project) return;
+    document.getElementById("project-name-input").value = project.name || "";
+    document.getElementById("project-subtitle-input").value = project.subtitle || "";
+    renderProjectBlocks();
+  }
+
+  function closeProjectDetail() {
+    currentProjectId = null;
+    document.getElementById("project-detail-view").classList.add("hidden");
+    document.getElementById("projects-list-view").classList.remove("hidden");
+    renderProjectsList();
+  }
+
+  function addBlock(type) {
+    var project = currentProject();
+    if (!project) return;
+    var block = { id: uid(), type: type, starred: false };
+    if (type === "heading") block.text = "";
+    else if (type === "text") block.text = "";
+    else if (type === "checklist") block.items = [{ id: uid(), text: "", checked: false }];
+    if (!project.content) project.content = [];
+    project.content.push(block);
+    saveCurrentProject();
+    renderProjectBlocks();
+  }
+
+  function removeBlock(blockId) {
+    var project = currentProject();
+    if (!project) return;
+    project.content = project.content.filter(function (b) { return b.id !== blockId; });
+    saveCurrentProject();
+    renderProjectBlocks();
+  }
+
+  function moveBlock(blockId, dir) {
+    var project = currentProject();
+    if (!project) return;
+    var idx = project.content.findIndex(function (b) { return b.id === blockId; });
+    var newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= project.content.length) return;
+    var tmp = project.content[idx];
+    project.content[idx] = project.content[newIdx];
+    project.content[newIdx] = tmp;
+    saveCurrentProject();
+    renderProjectBlocks();
+  }
+
+  function toggleBlockStar(blockId) {
+    var project = currentProject();
+    var block = project.content.filter(function (b) { return b.id === blockId; })[0];
+    if (!block) return;
+
+    if (!block.starred) {
+      var label = block.type === "checklist" ? "Checklist" : (block.text || "Untitled").slice(0, 40);
+      var payload = block.type === "checklist" ? { items: block.items } : { text: block.text };
+      supabaseClient.from("reusable_blocks").insert({
+        user_id: state.session.user.id, type: block.type, content: payload, label: label
+      }).select().single().then(function (res) {
+        if (res.error) { console.error("Axis: star block failed", res.error); return; }
+        state.reusableBlocks.unshift(res.data);
+        block.starred = true;
+        block.reusableId = res.data.id;
+        saveCurrentProject();
+        renderProjectBlocks();
+      });
+    } else {
+      var reusableId = block.reusableId;
+      block.starred = false;
+      saveCurrentProject();
+      renderProjectBlocks();
+      if (reusableId) {
+        state.reusableBlocks = state.reusableBlocks.filter(function (b) { return b.id !== reusableId; });
+        supabaseClient.from("reusable_blocks").delete().eq("id", reusableId).then(function (res) {
+          if (res.error) console.error("Axis: unstar block failed", res.error);
+        });
+      }
+    }
+  }
+
+  function renderProjectBlocks() {
+    var project = currentProject();
+    var wrap = document.getElementById("project-blocks");
+    if (!project || !wrap) return;
+    wrap.innerHTML = "";
+
+    (project.content || []).forEach(function (block, index) {
+      var el = document.createElement("div");
+      el.className = "content-block";
+
+      var controls = document.createElement("div");
+      controls.className = "block-controls";
+      controls.innerHTML =
+        '<button type="button" class="block-control-btn star-btn' + (block.starred ? " star-active" : "") + '" title="Save as reusable">★</button>' +
+        '<button type="button" class="block-control-btn up-btn" title="Move up">↑</button>' +
+        '<button type="button" class="block-control-btn down-btn" title="Move down">↓</button>' +
+        '<button type="button" class="block-control-btn remove-btn" title="Delete">&times;</button>';
+      controls.querySelector(".star-btn").addEventListener("click", function () { toggleBlockStar(block.id); });
+      controls.querySelector(".up-btn").addEventListener("click", function () { moveBlock(block.id, -1); });
+      controls.querySelector(".down-btn").addEventListener("click", function () { moveBlock(block.id, 1); });
+      controls.querySelector(".remove-btn").addEventListener("click", function () { removeBlock(block.id); });
+      el.appendChild(controls);
+
+      if (block.type === "heading") {
+        var hInput = document.createElement("input");
+        hInput.type = "text";
+        hInput.className = "block-heading-input";
+        hInput.placeholder = "Heading";
+        hInput.value = block.text || "";
+        hInput.addEventListener("input", function () { block.text = hInput.value; saveCurrentProject(); });
+        el.appendChild(hInput);
+      } else if (block.type === "text") {
+        var tInput = document.createElement("textarea");
+        tInput.className = "block-text-input";
+        tInput.placeholder = "Write something…";
+        tInput.value = block.text || "";
+        tInput.addEventListener("input", function () { block.text = tInput.value; saveCurrentProject(); });
+        el.appendChild(tInput);
+      } else if (block.type === "checklist") {
+        var title = document.createElement("p");
+        title.className = "checklist-block-title";
+        title.textContent = "Checklist";
+        el.appendChild(title);
+
+        (block.items || []).forEach(function (item) {
+          var row = document.createElement("div");
+          row.className = "checklist-item-row";
+
+          var check = document.createElement("button");
+          check.type = "button";
+          check.className = "checklist-item-check" + (item.checked ? " checked" : "");
+          check.addEventListener("click", function () {
+            item.checked = !item.checked;
+            saveCurrentProject();
+            renderProjectBlocks();
+            renderProjectsList();
+          });
+          row.appendChild(check);
+
+          var textInput = document.createElement("input");
+          textInput.type = "text";
+          textInput.className = "checklist-item-text";
+          textInput.placeholder = "List item…";
+          textInput.value = item.text || "";
+          textInput.addEventListener("input", function () { item.text = textInput.value; saveCurrentProject(); });
+          row.appendChild(textInput);
+
+          var removeItemBtn = document.createElement("button");
+          removeItemBtn.type = "button";
+          removeItemBtn.className = "checklist-item-remove";
+          removeItemBtn.innerHTML = "&times;";
+          removeItemBtn.addEventListener("click", function () {
+            block.items = block.items.filter(function (it) { return it.id !== item.id; });
+            saveCurrentProject();
+            renderProjectBlocks();
+          });
+          row.appendChild(removeItemBtn);
+
+          el.appendChild(row);
+        });
+
+        var addItemBtn = document.createElement("button");
+        addItemBtn.type = "button";
+        addItemBtn.className = "checklist-add-item-btn";
+        addItemBtn.textContent = "+ Add item";
+        addItemBtn.addEventListener("click", function () {
+          if (!block.items) block.items = [];
+          block.items.push({ id: uid(), text: "", checked: false });
+          saveCurrentProject();
+          renderProjectBlocks();
+        });
+        el.appendChild(addItemBtn);
+      }
+
+      wrap.appendChild(el);
+    });
+  }
+
+  function renderBlockLibrary() {
+    var wrap = document.getElementById("block-library-list");
+    if (state.reusableBlocks.length === 0) {
+      wrap.innerHTML = '<p class="empty-note">No saved blocks yet — tap the star on any block to save it here.</p>';
+      return;
+    }
+    wrap.innerHTML = "";
+    state.reusableBlocks.forEach(function (rb) {
+      var row = document.createElement("div");
+      row.className = "block-library-item";
+      row.innerHTML =
+        '<span><span class="block-library-item-label">' + rb.label + '</span><br><span class="block-library-item-type">' + rb.type + '</span></span>' +
+        '<span class="calc-btn" style="margin:0;padding:0.35rem 0.8rem;font-size:0.75rem;">Insert</span>';
+      row.addEventListener("click", function () { insertLibraryBlock(rb); });
+      wrap.appendChild(row);
+    });
+  }
+
+  function insertLibraryBlock(rb) {
+    var project = currentProject();
+    if (!project) return;
+    var block = { id: uid(), type: rb.type, starred: false };
+    if (rb.type === "checklist") {
+      block.items = (rb.content.items || []).map(function (it) { return { id: uid(), text: it.text, checked: false }; });
+    } else {
+      block.text = rb.content.text || "";
+    }
+    if (!project.content) project.content = [];
+    project.content.push(block);
+    saveCurrentProject();
+    renderProjectBlocks();
+    document.getElementById("block-library-modal").classList.add("hidden");
+  }
+
+  function initProjects() {
+    document.getElementById("new-project-btn").addEventListener("click", addProject);
+    document.getElementById("project-back-link").addEventListener("click", function (e) {
+      e.preventDefault();
+      closeProjectDetail();
+    });
+    document.getElementById("project-name-input").addEventListener("input", function () {
+      var project = currentProject();
+      if (!project) return;
+      project.name = this.value;
+      saveCurrentProject();
+    });
+    document.getElementById("project-subtitle-input").addEventListener("input", function () {
+      var project = currentProject();
+      if (!project) return;
+      project.subtitle = this.value;
+      saveCurrentProject();
+    });
+    document.querySelectorAll(".block-add-btn[data-block-type]").forEach(function (btn) {
+      btn.addEventListener("click", function () { addBlock(btn.getAttribute("data-block-type")); });
+    });
+    document.getElementById("open-block-library-btn").addEventListener("click", function () {
+      renderBlockLibrary();
+      document.getElementById("block-library-modal").classList.remove("hidden");
+    });
+    document.getElementById("close-block-library-btn").addEventListener("click", function () {
+      document.getElementById("block-library-modal").classList.add("hidden");
     });
   }
 
@@ -1807,7 +2141,6 @@
 
   function renderAll() {
     renderTopbar();
-   
     renderDaily();
     renderDashboard();
     renderFinancial();
@@ -1817,6 +2150,7 @@
     renderAnalytics();
     renderSettings();
     renderProfile();
+    renderProjectsList();
   }
 
   // ==================== PWA INSTALL ====================
@@ -1866,7 +2200,7 @@
   document.addEventListener("DOMContentLoaded", function () {
     var initializers = [
       initAuthGate, initResetFlow, initNav, initTheme, initFinancialCalculator,
-      initDashboardToggle, initSettings, initCoach, initChestModal, initProfile, initStickyDashTopbar
+      initDashboardToggle, initSettings, initCoach, initChestModal, initProfile, initStickyDashTopbar, initProjects
     ];
     initializers.forEach(function (fn) {
       try { fn(); } catch (e) { console.error("Axis: " + fn.name + " failed to init", e); }
