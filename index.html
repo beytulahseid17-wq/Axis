@@ -121,6 +121,8 @@
     <nav class="side-nav" id="side-nav-full">
       <button class="nav-item active" data-page="dashboard">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>Dashboard</button>
+      <button class="nav-item" data-page="projects">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Projects</button>
       <button class="nav-item" data-page="analytics">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/></svg>Analytics</button>
       <button class="nav-item" data-page="financial">
@@ -325,6 +327,47 @@
           </div>
         </div>
       </section>
+
+      <!-- Projects -->
+      <section data-page="projects" class="page hidden">
+
+        <div id="projects-list-view">
+          <div class="page-header-row">
+            <div><h1>Projects</h1><p class="sub">Build project pages from reusable blocks — headings, notes, checklists.</p></div>
+            <button type="button" class="calc-btn" id="new-project-btn">+ New Project</button>
+          </div>
+          <div id="projects-grid" class="projects-grid"></div>
+        </div>
+
+        <div id="project-detail-view" class="hidden">
+          <a href="#" class="back-link" id="project-back-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            All Projects
+          </a>
+          <div class="project-detail-header">
+            <input type="text" id="project-name-input" class="project-name-input" placeholder="Project name">
+            <input type="text" id="project-subtitle-input" class="project-subtitle-input" placeholder="Short description">
+          </div>
+
+          <div class="block-toolbar">
+            <button type="button" class="block-add-btn" data-block-type="heading">+ Heading</button>
+            <button type="button" class="block-add-btn" data-block-type="text">+ Text</button>
+            <button type="button" class="block-add-btn" data-block-type="checklist">+ Checklist</button>
+            <button type="button" class="block-add-btn library-btn" id="open-block-library-btn">★ Insert from Library</button>
+          </div>
+
+          <div id="project-blocks" class="project-blocks"></div>
+        </div>
+      </section>
+
+      <div id="block-library-modal" class="auth-gate hidden">
+        <div class="auth-gate-card">
+          <h2>Reusable Blocks</h2>
+          <p class="auth-gate-sub">Insert a saved block into this project.</p>
+          <div id="block-library-list" class="block-library-list"></div>
+          <button type="button" class="auth-gate-dismiss" id="close-block-library-btn">Close</button>
+        </div>
+      </div>
 
       <!-- Analytics -->
       <section data-page="analytics" class="page hidden">
@@ -554,8 +597,8 @@
       <span class="bottom-nav-label"><span class="bottom-nav-label-text">Dashboard</span></span>
       <span class="bottom-nav-badge hidden" id="mobile-notif-badge">0</span>
     </button>
-    <button class="bottom-nav-item" data-page="goals">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/></svg>
+    <button class="bottom-nav-item" data-page="projects">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
       <span class="bottom-nav-label"><span class="bottom-nav-label-text">Projects</span></span>
     </button>
     <button class="bottom-nav-item" data-page="templates">
