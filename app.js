@@ -1010,6 +1010,44 @@
     return total > 0 ? Math.round((done / total) * 100) : 0;
   }
 
+  var DASH_QUOTES = [
+    { text: "Discipline is choosing between what you want now and what you want most.", author: "Unknown" },
+    { text: "Small steps every day lead to big change over time.", author: "Unknown" },
+    { text: "Motivation gets you started. Momentum keeps you going.", author: "Jim Ryun" },
+    { text: "You do not rise to the level of your goals. You fall to the level of your systems.", author: "James Clear" },
+    { text: "The secret of getting ahead is getting started.", author: "Mark Twain" }
+  ];
+
+  function renderDashQuote() {
+    var textEl = document.getElementById("dash-quote-text");
+    if (!textEl) return;
+    var dayIndex = Math.floor(Date.now() / 86400000) % DASH_QUOTES.length;
+    var q = DASH_QUOTES[dayIndex];
+    textEl.textContent = q.text;
+    document.getElementById("dash-quote-author").textContent = "— " + q.author;
+  }
+
+  function renderProjectsPreview() {
+    var wrap = document.getElementById("dash-projects-preview");
+    if (!wrap) return;
+    if (state.projects.length === 0) {
+      wrap.innerHTML = '<p class="empty-note">No projects yet.</p>';
+      return;
+    }
+    wrap.innerHTML = "";
+    state.projects.slice(0, 4).forEach(function (p) {
+      var pct = projectProgress(p);
+      var row = document.createElement("div");
+      row.className = "dash-project-row";
+      row.innerHTML =
+        '<span class="dash-project-row-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>' +
+        '<span><span class="dash-project-row-name">' + (p.name || "Untitled project") + '</span><br><span class="dash-project-row-sub">' + (p.subtitle || "No description") + '</span></span>' +
+        '<span class="dash-project-row-pct">' + pct + '%</span>';
+      row.addEventListener("click", function () { goToPage("projects"); openProjectDetail(p.id); });
+      wrap.appendChild(row);
+    });
+  }
+
   function renderProjectsList() {
     var grid = document.getElementById("projects-grid");
     if (!grid) return;
@@ -1047,14 +1085,14 @@
       .select().single().then(function (res) {
         if (res.error) { console.error("Axis: add project failed", res.error); return; }
         state.projects.push(res.data);
-        renderProjectsList();
+        renderProjectsList(); renderProjectsPreview();
         openProjectDetail(res.data.id);
       });
   }
 
   function removeProject(id) {
     state.projects = state.projects.filter(function (p) { return p.id !== id; });
-    renderProjectsList();
+    renderProjectsList(); renderProjectsPreview();
     supabaseClient.from("projects").delete().eq("id", id).then(function (res) {
       if (res.error) console.error("Axis: remove project failed", res.error);
     });
@@ -1088,7 +1126,7 @@
     currentProjectId = null;
     document.getElementById("project-detail-view").classList.add("hidden");
     document.getElementById("projects-list-view").classList.remove("hidden");
-    renderProjectsList();
+    renderProjectsList(); renderProjectsPreview();
   }
 
   function addBlock(type) {
@@ -1212,7 +1250,7 @@
             item.checked = !item.checked;
             saveCurrentProject();
             renderProjectBlocks();
-            renderProjectsList();
+            renderProjectsList(); renderProjectsPreview();
           });
           row.appendChild(check);
 
@@ -1291,6 +1329,19 @@
 
   function initProjects() {
     document.getElementById("new-project-btn").addEventListener("click", addProject);
+
+    var desktopAddBtn = document.getElementById("desktop-new-project-btn");
+    if (desktopAddBtn) desktopAddBtn.addEventListener("click", function () {
+      goToPage("projects");
+      addProject();
+    });
+
+    var mobileAddBtn = document.getElementById("mobile-new-project-btn");
+    if (mobileAddBtn) mobileAddBtn.addEventListener("click", function () {
+      goToPage("projects");
+      addProject();
+    });
+
     document.getElementById("project-back-link").addEventListener("click", function (e) {
       e.preventDefault();
       closeProjectDetail();
@@ -1348,10 +1399,12 @@
   function renderDashboard() {
     renderTopbar();
     renderDashGreeting();
+    renderDashQuote();
     renderYourFocus();
     renderDesktopStats();
     renderTodayPlan();
     renderGoalsCards(); renderGoalsPreview();
+    renderProjectsPreview();
     renderDashboardChart();
     renderTemplatesPreview();
     renderCalendar();
@@ -2150,7 +2203,7 @@
     renderAnalytics();
     renderSettings();
     renderProfile();
-    renderProjectsList();
+    renderProjectsList(); renderProjectsPreview();
   }
 
   // ==================== PWA INSTALL ====================
@@ -2187,6 +2240,7 @@
     document.getElementById("app-shell").classList.remove("hidden");
     document.getElementById("bottom-nav").classList.remove("hidden");
     document.getElementById("coach-toggle").classList.remove("hidden");
+    document.getElementById("mobile-new-project-btn").classList.remove("hidden");
   }
 
   function exitToAuth() {
@@ -2194,6 +2248,7 @@
     document.getElementById("bottom-nav").classList.add("hidden");
     document.getElementById("coach-toggle").classList.add("hidden");
     document.getElementById("coach-panel").classList.add("hidden");
+    document.getElementById("mobile-new-project-btn").classList.add("hidden");
     document.getElementById("auth-gate").classList.remove("hidden");
   }
 
