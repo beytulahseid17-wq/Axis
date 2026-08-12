@@ -492,8 +492,14 @@
   function renderTopbar() {
     var habits = dailyHabits();
     var bestStreak = habits.reduce(function (max, h) { return Math.max(max, habitStreak(h.id)); }, 0);
-    var streakEl = document.getElementById("profile-cover-streak");
-    if (streakEl) streakEl.textContent = bestStreak;
+    // top-right pills (desktop)
+    var trStreak = document.getElementById("tr-streak-value");
+    if (trStreak) trStreak.textContent = bestStreak;
+    var trCoins = document.getElementById("tr-coins-value");
+    if (trCoins) trCoins.textContent = state.coins;
+    // profile cover badges (mobile profile page)
+    var coverStreak = document.getElementById("profile-cover-streak");
+    if (coverStreak) coverStreak.textContent = bestStreak;
     updateCoinDisplay();
 
     var remaining = habits.filter(function (h) { return !isDone(h.id, 0); }).length;
@@ -502,6 +508,14 @@
       mobileBadge.textContent = remaining;
       mobileBadge.classList.toggle("hidden", remaining === 0);
     }
+    // sidebar user row
+    var initial = (state.fullName || state.displayName || (state.session && state.session.user.email) || "A").charAt(0).toUpperCase();
+    var sideAvatar = document.getElementById("sidebar-user-avatar");
+    if (sideAvatar) sideAvatar.textContent = initial;
+    var sideName = document.getElementById("sidebar-user-name");
+    if (sideName) sideName.textContent = state.fullName || state.displayName || "Your name";
+    var sidePlan = document.getElementById("sidebar-user-plan");
+    if (sidePlan) sidePlan.textContent = state.plan === "premium" ? "Premium Plan" : "Free Plan";
   }
 
   // ==================== DATA LOADING ====================
@@ -766,10 +780,40 @@
 
   function renderYourFocus() {
     var pct = Math.round(dayCompletionPct(0));
-    var donut = document.getElementById("dash-donut");
-    donut.style.background = "conic-gradient(var(--accent) " + pct + "%, var(--surface-2) " + pct + "%)";
-    document.getElementById("dash-donut-value").textContent = pct + "%";
-    document.getElementById("dash-donut-label").textContent = "Momentum";
+
+    // Desktop Focus donut (new element)
+    var desktopDonut = document.getElementById("dash-donut");
+    if (desktopDonut) {
+      desktopDonut.style.background = "conic-gradient(var(--accent) " + pct + "%, var(--surface) " + pct + "%)";
+      var pctEl = document.getElementById("dash-donut-value");
+      if (pctEl) pctEl.textContent = pct + "%";
+    }
+
+    // Mobile momentum donut
+    var mobileDonut = document.getElementById("dash-donut-mobile");
+    if (mobileDonut) {
+      mobileDonut.style.background = "conic-gradient(var(--accent) " + pct + "%, var(--surface-2) " + pct + "%)";
+      var mPctEl = document.getElementById("dash-donut-value-mobile");
+      if (mPctEl) mPctEl.textContent = pct + "%";
+    }
+
+    // Focus goal text
+    var focusGoal = document.getElementById("dash-focus-goal");
+    if (focusGoal) {
+      var topGoal = state.generalGoals[0] || state.financialGoals[0];
+      focusGoal.textContent = topGoal ? topGoal.name : "Add goals to see your focus here.";
+    }
+
+    // Next action — first incomplete habit
+    var nextItem = document.getElementById("dash-next-action-item");
+    if (nextItem) {
+      var habits = dailyHabits();
+      var next = habits.filter(function (h) { return !isDone(h.id, 0); })[0];
+      var circle = nextItem.querySelector(".dash-next-circle");
+      var text = nextItem.querySelector(".dash-next-text");
+      if (next && text) { text.textContent = next.name; }
+      else if (text) { text.textContent = habits.length ? "All done today!" : "No habits added yet"; }
+    }
   }
 
   function renderDesktopStats() {
@@ -789,17 +833,16 @@
       trendEl.style.color = diff >= 0 ? "var(--accent)" : "var(--physical)";
     }
 
-    document.getElementById("stat-tasks-today").textContent = doneCount + "/" + habits.length;
-    document.getElementById("stat-tasks-pct").textContent = todayPct + "% momentum";
-    document.getElementById("stat-tasks-ring").style.background =
-      "conic-gradient(var(--accent) " + todayPct + "%, var(--surface-2) " + todayPct + "%)";
+    var ste = document.getElementById("stat-tasks-today"); if (ste) ste.textContent = doneCount + "/" + habits.length;
+    var stp = document.getElementById("stat-tasks-pct"); if (stp) stp.textContent = todayPct + "% momentum";
+    var str = document.getElementById("stat-tasks-ring"); if (str) str.style.background = "conic-gradient(var(--accent) " + todayPct + "%, var(--surface-2) " + todayPct + "%)";
 
     // desktop's paired Task Progress donut (separate element from the mobile "Your Focus" donut)
     var donut2 = document.getElementById("dash-donut-2");
     if (donut2) {
       var pendingPct = 100 - todayPct;
       donut2.style.background = "conic-gradient(var(--accent) " + todayPct + "%, var(--surface-2) " + todayPct + "%)";
-      document.getElementById("dash-donut-value-2").textContent = todayPct + "%";
+      var dv2 = document.getElementById("dash-donut-value-2"); if (dv2) dv2.textContent = todayPct + "%";
       var legend = document.getElementById("dash-donut-legend");
       if (legend) {
         legend.innerHTML =
@@ -830,7 +873,10 @@
     var hour = new Date().getHours();
     var timeGreeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
     var name = state.fullName || state.displayName;
-    document.getElementById("dash-greeting").textContent = timeGreeting + (name ? ", " + name + "!" : "!");
+    var emoji = hour < 12 ? " ☀️" : hour < 18 ? " 👋" : " 🌙";
+    var text = timeGreeting + (name ? ", " + name + "!" : "!") + emoji;
+    var el = document.getElementById("dash-greeting");
+    if (el) el.textContent = text;
     var aiGreeting = document.getElementById("ai-inline-greeting");
     if (aiGreeting) aiGreeting.textContent = (name ? "Hi " + name + "! " : "Hi! ") + "How can I help you build momentum today?";
   }
@@ -853,10 +899,38 @@
   }
 
   function renderTodayPlan() {
-    var wrap = document.getElementById("dash-today-plan");
     var habits = dailyHabits();
-    wrap.innerHTML = "";
-    wrap.appendChild(buildHabitListEl(habits));
+
+    // Desktop — rich rows with check, name, tag, time
+    var desktopWrap = document.getElementById("dash-today-plan");
+    if (desktopWrap) {
+      if (habits.length === 0) {
+        desktopWrap.innerHTML = '<p class="empty-note" style="padding:1rem 0;">Add habits to see your plan here.</p>';
+      } else {
+        desktopWrap.innerHTML = "";
+        habits.slice(0, 6).forEach(function (h, idx) {
+          var done = isDone(h.id, 0);
+          var row = document.createElement("div");
+          row.className = "dash-plan-row";
+          var hour = 6 + idx * 2;
+          var timeStr = (hour > 12 ? hour - 12 : hour) + ":00 " + (hour >= 12 ? "PM" : "AM");
+          row.innerHTML =
+            '<button type="button" class="dash-plan-check' + (done ? " done" : "") + '" data-habit="' + h.id + '"></button>' +
+            '<span class="dash-plan-name' + (done ? " done-text" : "") + '">' + h.name + '</span>' +
+            '<span class="dash-plan-time">' + timeStr + '</span>';
+          var checkBtn = row.querySelector(".dash-plan-check");
+          checkBtn.addEventListener("click", function (e) { e.stopPropagation(); toggleHabit(h.id); });
+          desktopWrap.appendChild(row);
+        });
+      }
+    }
+
+    // Mobile — numbered list
+    var mobileWrap = document.getElementById("dash-today-plan-mobile");
+    if (mobileWrap) {
+      mobileWrap.innerHTML = "";
+      mobileWrap.appendChild(buildHabitListEl(habits));
+    }
   }
 
   function renderTemplatesPreview() {
@@ -1327,6 +1401,80 @@
     document.getElementById("block-library-modal").classList.add("hidden");
   }
 
+  // ==================== FOCUS TIMER ====================
+
+  var timerSeconds = 25 * 60;
+  var timerInterval = null;
+  var timerRunning = false;
+
+  function formatTimer(s) {
+    var m = Math.floor(s / 60);
+    var sec = s % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (sec < 10 ? "0" : "") + sec;
+  }
+
+  function initFocusTimer() {
+    var display = document.getElementById("dash-timer-display");
+    var btn = document.getElementById("dash-timer-btn");
+    if (!display || !btn) return;
+
+    display.textContent = formatTimer(timerSeconds);
+
+    btn.addEventListener("click", function () {
+      if (timerRunning) {
+        clearInterval(timerInterval);
+        timerRunning = false;
+        btn.textContent = "Start";
+      } else {
+        if (timerSeconds === 0) timerSeconds = 25 * 60;
+        timerRunning = true;
+        btn.textContent = "Pause";
+        timerInterval = setInterval(function () {
+          timerSeconds--;
+          display.textContent = formatTimer(timerSeconds);
+          if (timerSeconds <= 0) {
+            clearInterval(timerInterval);
+            timerRunning = false;
+            btn.textContent = "Start";
+            adjustCoins(10);
+            showJourneyToast("Focus session complete!", "+10 coins");
+          }
+        }, 1000);
+      }
+    });
+  }
+
+  // ==================== DAILY REFLECTION ====================
+
+  function initDailyReflection() {
+    var btn = document.getElementById("dash-reflection-save-btn");
+    var input = document.getElementById("dash-reflection-input");
+    if (!btn || !input) return;
+
+    var saved = localStorage.getItem("axis-reflection-" + new Date().toISOString().slice(0, 10));
+    if (saved) input.value = saved;
+
+    btn.addEventListener("click", function () {
+      var text = input.value.trim();
+      if (!text) return;
+      localStorage.setItem("axis-reflection-" + new Date().toISOString().slice(0, 10), text);
+      btn.style.color = "var(--accent)";
+      setTimeout(function () { btn.style.color = ""; }, 1500);
+    });
+  }
+
+  // ==================== TODAY'S PLAN TABS ====================
+
+  function initDashPlanTabs() {
+    document.querySelectorAll(".dash-plan-tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        document.querySelectorAll(".dash-plan-tab").forEach(function (t) { t.classList.remove("active"); });
+        tab.classList.add("active");
+        renderTodayPlan();
+      });
+    });
+  }
+
   function initProjects() {
     document.getElementById("new-project-btn").addEventListener("click", addProject);
 
@@ -1393,7 +1541,7 @@
 
   function renderDashboardChart() {
     var series = dashRange === "weekly" ? completionSeries(28).filter(function (_, i) { return i % 4 === 0; }) : completionSeries(7);
-    renderComboChart(document.getElementById("dash-chart"), series);
+    var chartEl = document.getElementById("dash-chart"); if (chartEl) renderComboChart(chartEl, series);
   }
 
   function renderDashboard() {
@@ -1401,14 +1549,10 @@
     renderDashGreeting();
     renderDashQuote();
     renderYourFocus();
-    renderDesktopStats();
     renderTodayPlan();
-    renderGoalsCards(); renderGoalsPreview();
+    renderGoalsCards();
     renderProjectsPreview();
-    renderDashboardChart();
-    renderTemplatesPreview();
     renderCalendar();
-    renderHabitsWeekGrid();
     renderNotes();
   }
 
@@ -2255,7 +2399,8 @@
   document.addEventListener("DOMContentLoaded", function () {
     var initializers = [
       initAuthGate, initResetFlow, initNav, initTheme, initFinancialCalculator,
-      initDashboardToggle, initSettings, initCoach, initChestModal, initProfile, initStickyDashTopbar, initProjects
+      initDashboardToggle, initSettings, initCoach, initChestModal, initProfile,
+      initStickyDashTopbar, initProjects, initFocusTimer, initDailyReflection, initDashPlanTabs
     ];
     initializers.forEach(function (fn) {
       try { fn(); } catch (e) { console.error("Axis: " + fn.name + " failed to init", e); }
