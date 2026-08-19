@@ -375,6 +375,21 @@
 
       <section data-page="projects" class="page hidden">
 
+        <!-- Sync status banner (shown when there are pending changes) -->
+        <div id="sync-status-bar" class="sync-status-bar hidden">
+          <div class="sync-status-inner">
+            <span class="sync-status-dot" id="sync-status-dot"></span>
+            <span id="sync-status-text">Checking…</span>
+          </div>
+          <button type="button" id="sync-now-btn" class="sync-now-btn">Sync now</button>
+        </div>
+
+        <!-- Offline status banner (shown when offline) -->
+        <div id="offline-banner" class="offline-banner hidden">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="1" y1="1" x2="23" y2="23"/><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.56 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+          <span>You're offline — showing locally available data. Changes will sync when you reconnect.</span>
+        </div>
+
         <div id="projects-list-view">
           <div class="page-header-row">
             <div><h1>Projects</h1><p class="sub">Build project pages from reusable blocks — headings, notes, checklists.</p></div>
@@ -391,6 +406,16 @@
           <div class="project-detail-header">
             <input type="text" id="project-name-input" class="project-name-input" placeholder="Project name">
             <input type="text" id="project-subtitle-input" class="project-subtitle-input" placeholder="Short description">
+          </div>
+
+          <!-- Offline toggle for this project -->
+          <div class="project-offline-row" id="project-offline-row">
+            <div class="project-offline-info">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 15a4 4 0 0 0 4 4h9a5 5 0 1 0-.1-9.999 5.002 5.002 0 0 0-9.78 2.096A4.001 4.001 0 0 0 3 15z"/></svg>
+              <span id="project-offline-label">Make available offline</span>
+              <span class="project-sync-badge hidden" id="project-sync-badge">synced</span>
+            </div>
+            <button type="button" class="offline-toggle-btn" id="project-offline-toggle">Enable</button>
           </div>
 
           <div class="block-toolbar">
@@ -690,7 +715,9 @@
   </div>
 </template>
 
+<script src="https://cdn.jsdelivr.net/npm/idb@8/build/umd.js"></script>
 <script src="config.js"></script>
+<script src="offline.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
