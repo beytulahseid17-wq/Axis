@@ -26,6 +26,187 @@
   var GUEST_KEY = "axis-guest-data";
   var currentProjectId = null;
   var pendingOnboarding = false;
+  var offlineReady = false;
+  var syncFlushTimer = null;
+
+  // ==================== OFFLINE ENGINE ====================
+
+  function initOfflineEngine() {
+    if (typeof AxisOffline === "undefined") {
+      console.warn("Axis: AxisOffline not loaded — offline mode unavailable");
+      return;
+    }
+    AxisOffline.open().then(function () {
+      offlineReady = true;
+      updateNetworkStatus();
+      updateSyncStatusBar();
+    }).catch(function (e) {
+      console.error("Axis: IndexedDB failed to open", e);
+    });
+
+    window.addEventListener("online", function () {
+      updateNetworkStatus();
+      triggerSync();
+    });
+    window.addEventListener("offline", updateNetworkStatus);
+
+    // Listen for SW-triggered sync
+    if (navigator.serviceWorker) {
+      navigator.serviceWorker.addEventListener("message", function (e) {
+        if (e.data && e.data.type === "TRIGGER_SYNC") triggerSync();
+      });
+    }
+  }
+
+  function updateNetworkStatus() {
+    var banner = document.getElementById("offline-banner");
+    if (banner) banner.classList.toggle("hidden", navigator.onLine);
+  }
+
+  function triggerSync() {
+    if (!navigator.onLine || !offlineReady || !state.session) return;
+    clearTimeout(syncFlushTimer);
+    syncFlushTimer = setTimeout(function () {
+      updateSyncBadge("syncing", "Syncing…");
+      AxisOffline.flush(supabaseClient).then(function (result) {
+        if (result.failed > 0) {
+          updateSyncBadge("error", result.failed + " changes failed to sync");
+        } else if (result.flushed > 0) {
+          updateSyncBadge("synced", "All changes synced");
+          setTimeout(updateSyncStatusBar, 2000);
+        } else {
+          updateSyncStatusBar();
+        }
+      });
+    }, 800);
+  }
+
+  function updateSyncStatusBar() {
+    if (!offlineReady) return;
+    AxisOffline.getPendingCount().then(function (count) {
+      var bar = document.getElementById("sync-status-bar");
+      var dot = document.getElementById("sync-status-dot");
+      var text = document.getElementById("sync-status-text");
+      if (!bar || !dot || !text) return;
+      if (count === 0) {
+        bar.classList.add("hidden");
+      } else {
+        bar.classList.remove("hidden");
+        dot.className = "sync-status-dot" + (navigator.onLine ? " syncing" : "");
+        text.textContent = count + " unsaved change" + (count === 1 ? "" : "s") + (navigator.onLine ? " — syncing…" : " — waiting for connection");
+      }
+    });
+  }
+
+  function updateSyncBadge(status, message) {
+    var dot = document.getElementById("sync-status-dot");
+    var text = document.getElementById("sync-status-text");
+    var bar = document.getElementById("sync-status-bar");
+    if (!dot || !text || !bar) return;
+    bar.classList.remove("hidden");
+    dot.className = "sync-status-dot " + status;
+    text.textContent = message;
+  }
+
+  function enqueueIfOffline(table, type, payload, id) {
+    if (!offlineReady) return;
+    AxisOffline.enqueue({ table: table, type: type, payload: payload, id: id,
+      updated_at: new Date().toISOString() }).then(function () {
+      updateSyncStatusBar();
+      if (navigator.onLine) triggerSync();
+    });
+  }
+
+  // ── Project offline toggle ─────────────────────────────────────────────────
+  function renderProjectOfflineToggle() {
+    if (!offlineReady || !currentProjectId) return;
+    var row = document.getElementById("project-offline-row");
+    var toggleBtn = document.getElementById("project-offline-toggle");
+    var label = document.getElementById("project-offline-label");
+    var badge = document.getElementById("project-sync-badge");
+    if (!row || !toggleBtn) return;
+
+    AxisOffline.isProjectOffline(currentProjectId).then(function (isOffline) {
+      toggleBtn.textContent = isOffline ? "Disable" : "Enable";
+      toggleBtn.classList.toggle("enabled", isOffline);
+      if (!isOffline) {
+        badge.classList.add("hidden");
+        return;
+      }
+      AxisOffline.get("offline_projects", currentProjectId).then(function (rec) {
+        if (!rec) return;
+        badge.classList.remove("hidden");
+        badge.className = "project-sync-badge " + (rec.sync_status || "idle");
+        var rel = rec.last_synced ? timeAgo(new Date(rec.last_synced)) : "never";
+        badge.textContent = rec.sync_status === "synced" ? "synced " + rel : (rec.sync_status || "idle");
+      });
+    });
+  }
+
+  function initProjectOfflineToggle() {
+    var btn = document.getElementById("project-offline-toggle");
+    if (!btn) return;
+    btn.addEventListener("click", function () {
+      if (!offlineReady || !currentProjectId) return;
+      AxisOffline.isProjectOffline(currentProjectId).then(function (isOffline) {
+        if (isOffline) {
+          AxisOffline.disableProjectOffline(currentProjectId).then(function () {
+            renderProjectOfflineToggle();
+            // Uncache via SW
+            if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+              navigator.serviceWorker.controller.postMessage({
+                type: "UNCACHE_PROJECT", projectId: currentProjectId
+              });
+            }
+          });
+        } else {
+          downloadProjectOffline(currentProjectId);
+        }
+      });
+    });
+
+    document.getElementById("sync-now-btn") && document.getElementById("sync-now-btn").addEventListener("click", triggerSync);
+  }
+
+  function downloadProjectOffline(projectId) {
+    if (!state.session) return;
+    var badge = document.getElementById("project-sync-badge");
+    var toggleBtn = document.getElementById("project-offline-toggle");
+    if (badge) { badge.classList.remove("hidden"); badge.className = "project-sync-badge syncing"; badge.textContent = "downloading…"; }
+    if (toggleBtn) { toggleBtn.disabled = true; }
+
+    AxisOffline.enableProjectOffline(projectId).then(function () {
+      var userId = state.session.user.id;
+      return Promise.all([
+        supabaseClient.from("projects").select("*").eq("id", projectId).single(),
+        supabaseClient.from("notes").select("*").eq("user_id", userId).limit(50),
+        supabaseClient.from("habits").select("*").eq("user_id", userId).eq("is_active", true)
+      ]).then(function (results) {
+        var proj = results[0].data;
+        var notes = results[1].data || [];
+        var habits = results[2].data || [];
+        return AxisOffline.snapshotProject(projectId, proj, [], notes, habits);
+      });
+    }).then(function () {
+      if (toggleBtn) { toggleBtn.disabled = false; }
+      renderProjectOfflineToggle();
+    }).catch(function (err) {
+      console.error("Axis: offline download failed", err);
+      AxisOffline.disableProjectOffline(projectId);
+      if (toggleBtn) { toggleBtn.disabled = false; }
+      if (badge) { badge.className = "project-sync-badge error"; badge.textContent = "download failed"; }
+    });
+  }
+
+  function timeAgo(date) {
+    var sec = Math.round((Date.now() - date) / 1000);
+    if (sec < 60) return "just now";
+    if (sec < 3600) return Math.floor(sec / 60) + "m ago";
+    if (sec < 86400) return Math.floor(sec / 3600) + "h ago";
+    return Math.floor(sec / 86400) + "d ago";
+  }
+
+
 
   function uid() {
     return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -591,6 +772,16 @@
       if (reusableRes.error) console.error("Axis: reusable blocks fetch failed", reusableRes.error);
       state.reusableBlocks = reusableRes.data || [];
 
+      // Persist to IndexedDB for offline access
+      if (offlineReady) {
+        state.habits.forEach(function (h) { AxisOffline.put("habits", h); });
+        state.notes.forEach(function (n) { AxisOffline.put("notes", n); });
+        state.projects.forEach(function (p) { AxisOffline.put("projects", p); });
+        AxisOffline.flush(supabaseClient).then(function (result) {
+          if (result.flushed > 0) updateSyncStatusBar();
+        });
+      }
+
       updateAdRail();
       updateCoinDisplay();
       renderAll();
@@ -625,10 +816,24 @@
       return;
     }
     var userId = state.session.user.id;
+    var tempId = uid();
+    var newHabit = { id: tempId, user_id: userId, dimension: "daily", name: name.trim(), is_active: true, created_at: new Date().toISOString() };
+    if (offlineReady) AxisOffline.put("habits", newHabit);
+    if (!navigator.onLine) {
+      state.habits.push(newHabit);
+      enqueueIfOffline("habits", "upsert", newHabit);
+      renderDaily(); renderDashboard(); renderTemplatesTab();
+      return;
+    }
     supabaseClient.from("habits").insert({ user_id: userId, dimension: "daily", name: name.trim() })
-      .select().single()
-      .then(function (res) {
-        if (res.error) { console.error("Axis: add habit failed", res.error); return; }
+      .select().single().then(function (res) {
+        if (res.error) {
+          state.habits.push(newHabit);
+          enqueueIfOffline("habits", "upsert", newHabit);
+          renderDaily(); renderDashboard(); renderTemplatesTab();
+          return;
+        }
+        if (offlineReady) AxisOffline.put("habits", res.data);
         state.habits.push(res.data);
         renderDaily(); renderDashboard(); renderTemplatesTab();
       });
@@ -636,10 +841,12 @@
 
   function removeHabit(habitId) {
     state.habits = state.habits.filter(function (h) { return h.id !== habitId; });
+    if (offlineReady) AxisOffline.del("habits", habitId);
     renderDaily(); renderDashboard();
     if (isGuest()) { saveGuestState(); return; }
+    if (!navigator.onLine) { enqueueIfOffline("habits", "delete", null, habitId); return; }
     supabaseClient.from("habits").delete().eq("id", habitId).then(function (res) {
-      if (res.error) console.error("Axis: remove habit failed", res.error);
+      if (res.error) enqueueIfOffline("habits", "delete", null, habitId);
     });
   }
 
@@ -653,15 +860,23 @@
 
     adjustCoins(currentlyDone ? -1 : 1);
     renderDaily(); renderDashboard(); renderAnalytics(); renderTopbar();
-
     if (isGuest()) { saveGuestState(); return; }
 
+    var entryRecord = { id: habitId + "_" + today, habit_id: habitId, user_id: state.session.user.id, entry_date: today, completed: !currentlyDone };
+    if (!currentlyDone && offlineReady) AxisOffline.put("habit_entries", entryRecord);
+    else if (currentlyDone && offlineReady) AxisOffline.del("habit_entries", habitId + "_" + today);
+
+    if (!navigator.onLine) {
+      enqueueIfOffline("habit_entries", currentlyDone ? "delete" : "upsert", currentlyDone ? null : entryRecord, currentlyDone ? (habitId + "_" + today) : null);
+      return;
+    }
     var userId = state.session.user.id;
     var query = currentlyDone
       ? supabaseClient.from("habit_entries").delete().eq("habit_id", habitId).eq("entry_date", today)
       : supabaseClient.from("habit_entries").insert({ user_id: userId, habit_id: habitId, entry_date: today, completed: true });
-
-    query.then(function (res) { if (res.error) console.error("Axis: toggle entry failed", res.error); });
+    query.then(function (res) {
+      if (res.error) enqueueIfOffline("habit_entries", currentlyDone ? "delete" : "upsert", currentlyDone ? null : entryRecord, currentlyDone ? (habitId + "_" + today) : null);
+    });
   }
 
   function buildHabitListEl(habits) {
@@ -1053,8 +1268,23 @@
 
   function addNote(text) {
     var userId = state.session.user.id;
+    var tempId = uid();
+    var newNote = { id: tempId, user_id: userId, text: text, created_at: new Date().toISOString() };
+    if (offlineReady) AxisOffline.put("notes", newNote);
+    if (!navigator.onLine) {
+      state.notes.unshift(newNote);
+      renderNotes();
+      enqueueIfOffline("notes", "upsert", newNote);
+      return;
+    }
     supabaseClient.from("notes").insert({ user_id: userId, text: text }).select().single().then(function (res) {
-      if (res.error) { console.error("Axis: add note failed", res.error); return; }
+      if (res.error) {
+        state.notes.unshift(newNote);
+        renderNotes();
+        enqueueIfOffline("notes", "upsert", newNote);
+        return;
+      }
+      if (offlineReady) AxisOffline.put("notes", res.data);
       state.notes.unshift(res.data);
       renderNotes();
     });
@@ -1062,9 +1292,11 @@
 
   function removeNote(id) {
     state.notes = state.notes.filter(function (n) { return n.id !== id; });
+    if (offlineReady) AxisOffline.del("notes", id);
     renderNotes();
+    if (!navigator.onLine) { enqueueIfOffline("notes", "delete", null, id); return; }
     supabaseClient.from("notes").delete().eq("id", id).then(function (res) {
-      if (res.error) console.error("Axis: remove note failed", res.error);
+      if (res.error) enqueueIfOffline("notes", "delete", null, id);
     });
   }
 
@@ -1125,30 +1357,53 @@
   function renderProjectsList() {
     var grid = document.getElementById("projects-grid");
     if (!grid) return;
+
+    // If offline and no in-memory projects, try loading from IndexedDB
+    if (!navigator.onLine && state.projects.length === 0 && offlineReady) {
+      AxisOffline.getAll("projects").then(function (localProjects) {
+        state.projects = localProjects || [];
+        _renderProjectsGrid(grid);
+      });
+      return;
+    }
+    _renderProjectsGrid(grid);
+  }
+
+  function _renderProjectsGrid(grid) {
     if (state.projects.length === 0) {
       grid.innerHTML = '<p class="empty-note">No projects yet — create your first one.</p>';
       return;
     }
-    grid.innerHTML = "";
-    state.projects.forEach(function (p) {
-      var pct = projectProgress(p);
-      var card = document.createElement("div");
-      card.className = "project-card";
-      card.innerHTML =
-        '<button type="button" class="project-card-remove" data-id="' + p.id + '">&times;</button>' +
-        '<div class="project-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>' +
-        '<p class="project-card-name">' + (p.name || "Untitled project") + '</p>' +
-        '<p class="project-card-sub">' + (p.subtitle || "No description yet") + '</p>' +
-        '<div class="project-card-progress-row"><div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--accent);"></div></div><span class="project-card-progress-pct">' + pct + '%</span></div>';
-      card.addEventListener("click", function (e) {
-        if (e.target.closest(".project-card-remove")) return;
-        openProjectDetail(p.id);
+    // Get offline project ids to badge them
+    var offlineIds = {};
+    var loadOfflineIds = offlineReady
+      ? AxisOffline.getOfflineProjects().then(function (recs) { recs.forEach(function (r) { offlineIds[r.project_id] = true; }); })
+      : Promise.resolve();
+
+    loadOfflineIds.then(function () {
+      grid.innerHTML = "";
+      state.projects.forEach(function (p) {
+        var pct = projectProgress(p);
+        var isOffline = !!offlineIds[p.id];
+        var card = document.createElement("div");
+        card.className = "project-card";
+        card.innerHTML =
+          '<button type="button" class="project-card-remove" data-id="' + p.id + '">&times;</button>' +
+          '<div class="project-card-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></div>' +
+          '<p class="project-card-name">' + (p.name || "Untitled project") +
+          (isOffline ? '<span class="project-card-offline-dot" title="Available offline"></span>' : '') + '</p>' +
+          '<p class="project-card-sub">' + (p.subtitle || "No description yet") + '</p>' +
+          '<div class="project-card-progress-row"><div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--accent);"></div></div><span class="project-card-progress-pct">' + pct + '%</span></div>';
+        card.addEventListener("click", function (e) {
+          if (e.target.closest(".project-card-remove")) return;
+          openProjectDetail(p.id);
+        });
+        card.querySelector(".project-card-remove").addEventListener("click", function (e) {
+          e.stopPropagation();
+          removeProject(p.id);
+        });
+        grid.appendChild(card);
       });
-      card.querySelector(".project-card-remove").addEventListener("click", function (e) {
-        e.stopPropagation();
-        removeProject(p.id);
-      });
-      grid.appendChild(card);
     });
   }
 
@@ -1176,11 +1431,20 @@
   function saveCurrentProject() {
     var project = currentProject();
     if (!project) return;
+    // Write to IndexedDB immediately (offline-first)
+    if (offlineReady) AxisOffline.put("projects", project);
     clearTimeout(saveProjectTimer);
     saveProjectTimer = setTimeout(function () {
+      if (isGuest()) return;
+      if (!navigator.onLine) {
+        enqueueIfOffline("projects", "upsert", { id: project.id, name: project.name, subtitle: project.subtitle, content: project.content, user_id: state.session && state.session.user.id });
+        return;
+      }
       supabaseClient.from("projects").update({ name: project.name, subtitle: project.subtitle, content: project.content })
         .eq("id", project.id).then(function (res) {
-          if (res.error) console.error("Axis: save project failed", res.error);
+          if (res.error) {
+            enqueueIfOffline("projects", "upsert", { id: project.id, name: project.name, subtitle: project.subtitle, content: project.content, user_id: state.session && state.session.user.id });
+          }
         });
     }, 500);
   }
@@ -1194,6 +1458,7 @@
     document.getElementById("project-name-input").value = project.name || "";
     document.getElementById("project-subtitle-input").value = project.subtitle || "";
     renderProjectBlocks();
+    renderProjectOfflineToggle();
   }
 
   function closeProjectDetail() {
@@ -2400,7 +2665,8 @@
     var initializers = [
       initAuthGate, initResetFlow, initNav, initTheme, initFinancialCalculator,
       initDashboardToggle, initSettings, initCoach, initChestModal, initProfile,
-      initStickyDashTopbar, initProjects, initFocusTimer, initDailyReflection, initDashPlanTabs
+      initStickyDashTopbar, initProjects, initFocusTimer, initDailyReflection, initDashPlanTabs,
+      initProjectOfflineToggle, initOfflineEngine
     ];
     initializers.forEach(function (fn) {
       try { fn(); } catch (e) { console.error("Axis: " + fn.name + " failed to init", e); }
