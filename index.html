@@ -110,6 +110,9 @@
 
   <!-- Top-right cluster: streak, coins, profile FAB -->
   <div class="topright-cluster" id="topright-cluster">
+    <button type="button" class="tr-add-project-btn desktop-only" id="desktop-new-project-btn" aria-label="New project" title="New project">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    </button>
     <div class="tr-pill tr-streak">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="#FF6B2B" stroke="none"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>
       <div>
@@ -399,10 +402,23 @@
         </div>
 
         <div id="project-detail-view" class="hidden">
+
           <a href="#" class="back-link" id="project-back-link">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
             All Projects
           </a>
+
+          <!-- Cover + icon -->
+          <div class="project-cover-bar" id="project-cover-bar">
+            <button type="button" class="project-cover-edit-btn" id="project-cover-edit-btn">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
+              Add cover
+            </button>
+            <button type="button" class="project-icon-badge" id="project-icon-badge" aria-label="Change icon">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            </button>
+          </div>
+
           <div class="project-detail-header">
             <input type="text" id="project-name-input" class="project-name-input" placeholder="Project name">
             <input type="text" id="project-subtitle-input" class="project-subtitle-input" placeholder="Short description">
@@ -435,6 +451,34 @@
           <p class="auth-gate-sub">Insert a saved block into this project.</p>
           <div id="block-library-list" class="block-library-list"></div>
           <button type="button" class="auth-gate-dismiss" id="close-block-library-btn">Close</button>
+        </div>
+      </div>
+
+      <!-- Cover picker -->
+      <div id="cover-picker-modal" class="auth-gate hidden">
+        <div class="auth-gate-card">
+          <h2>Set a cover</h2>
+          <p class="auth-gate-sub">Upload your own image or pick one from Unsplash.</p>
+
+          <button type="button" class="cover-upload-btn" id="cover-upload-trigger">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Upload from device
+          </button>
+          <input type="file" id="cover-file-input" accept="image/*" class="hidden">
+
+          <p class="cover-section-label">Or choose from Unsplash</p>
+          <div id="unsplash-cover-grid" class="unsplash-cover-grid"></div>
+
+          <button type="button" class="auth-gate-dismiss" id="close-cover-picker-btn">Close</button>
+        </div>
+      </div>
+
+      <!-- Icon picker -->
+      <div id="icon-picker-modal" class="auth-gate hidden">
+        <div class="auth-gate-card">
+          <h2>Choose an icon</h2>
+          <div id="icon-picker-grid" class="icon-picker-grid"></div>
+          <button type="button" class="auth-gate-dismiss" id="close-icon-picker-btn">Close</button>
         </div>
       </div>
 
