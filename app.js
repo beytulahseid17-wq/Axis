@@ -658,6 +658,10 @@
   function updateCoinDisplay() {
     var el = document.getElementById("profile-cover-coins");
     if (el) el.textContent = state.coins;
+    var trCoins = document.getElementById("tr-coins-value");
+    if (trCoins) trCoins.textContent = state.coins;
+    var mobileTrCoins = document.getElementById("mobile-tr-coins-value");
+    if (mobileTrCoins) mobileTrCoins.textContent = state.coins;
   }
 
   function adjustCoins(delta) {
@@ -678,6 +682,11 @@
     if (trStreak) trStreak.textContent = bestStreak;
     var trCoins = document.getElementById("tr-coins-value");
     if (trCoins) trCoins.textContent = state.coins;
+    // mobile header pills
+    var mobileTrStreak = document.getElementById("mobile-tr-streak-value");
+    if (mobileTrStreak) mobileTrStreak.textContent = bestStreak;
+    var mobileTrCoins = document.getElementById("mobile-tr-coins-value");
+    if (mobileTrCoins) mobileTrCoins.textContent = state.coins;
     // profile cover badges (mobile profile page)
     var coverStreak = document.getElementById("profile-cover-streak");
     if (coverStreak) coverStreak.textContent = bestStreak;
@@ -1469,13 +1478,29 @@
     renderProjectsList(); renderProjectsPreview();
   }
 
+  var LIST_TYPES = ["bulleted-list", "numbered-list", "task"];
+
+  function defaultBlockContent(type) {
+    switch (type) {
+      case "title": return { text: "" };
+      case "heading": return { text: "" };
+      case "text": return { text: "" };
+      case "bulleted-list": return { items: [{ id: uid(), text: "" }] };
+      case "numbered-list": return { items: [{ id: uid(), text: "" }] };
+      case "task": return { items: [{ id: uid(), text: "", checked: false }] };
+      case "divider": return {};
+      case "image": return { url: "", caption: "" };
+      case "file": return { url: "", filename: "" };
+      case "link": return { url: "", label: "" };
+      case "table": return { rows: [["", ""], ["", ""]] };
+      default: return { text: "" };
+    }
+  }
+
   function addBlock(type) {
     var project = currentProject();
     if (!project) return;
-    var block = { id: uid(), type: type, starred: false };
-    if (type === "heading") block.text = "";
-    else if (type === "text") block.text = "";
-    else if (type === "checklist") block.items = [{ id: uid(), text: "", checked: false }];
+    var block = Object.assign({ id: uid(), type: type, starred: false }, defaultBlockContent(type));
     if (!project.content) project.content = [];
     project.content.push(block);
     saveCurrentProject();
@@ -1503,16 +1528,34 @@
     renderProjectBlocks();
   }
 
+  function blockStarLabel(block) {
+    if (LIST_TYPES.indexOf(block.type) !== -1) return block.type.replace("-", " ");
+    if (block.type === "table") return "Table";
+    if (block.type === "image") return "Image";
+    if (block.type === "file") return block.filename || "File";
+    if (block.type === "link") return block.label || block.url || "Link";
+    if (block.type === "divider") return "Divider";
+    return (block.text || "Untitled").slice(0, 40);
+  }
+
+  function blockStarPayload(block) {
+    if (LIST_TYPES.indexOf(block.type) !== -1) return { items: block.items };
+    if (block.type === "table") return { rows: block.rows };
+    if (block.type === "image") return { url: block.url, caption: block.caption };
+    if (block.type === "file") return { url: block.url, filename: block.filename };
+    if (block.type === "link") return { url: block.url, label: block.label };
+    if (block.type === "divider") return {};
+    return { text: block.text };
+  }
+
   function toggleBlockStar(blockId) {
     var project = currentProject();
     var block = project.content.filter(function (b) { return b.id === blockId; })[0];
     if (!block) return;
 
     if (!block.starred) {
-      var label = block.type === "checklist" ? "Checklist" : (block.text || "Untitled").slice(0, 40);
-      var payload = block.type === "checklist" ? { items: block.items } : { text: block.text };
       supabaseClient.from("reusable_blocks").insert({
-        user_id: state.session.user.id, type: block.type, content: payload, label: label
+        user_id: state.session.user.id, type: block.type, content: blockStarPayload(block), label: blockStarLabel(block)
       }).select().single().then(function (res) {
         if (res.error) { console.error("Axis: star block failed", res.error); return; }
         state.reusableBlocks.unshift(res.data);
@@ -1535,30 +1578,254 @@
     }
   }
 
+  function buildBlockControls(block) {
+    var controls = document.createElement("div");
+    controls.className = "block-controls";
+    controls.innerHTML =
+      '<button type="button" class="block-control-btn star-btn' + (block.starred ? " star-active" : "") + '" title="Save as reusable">★</button>' +
+      '<button type="button" class="block-control-btn up-btn" title="Move up">↑</button>' +
+      '<button type="button" class="block-control-btn down-btn" title="Move down">↓</button>' +
+      '<button type="button" class="block-control-btn remove-btn" title="Delete">&times;</button>';
+    controls.querySelector(".star-btn").addEventListener("click", function () { toggleBlockStar(block.id); });
+    controls.querySelector(".up-btn").addEventListener("click", function () { moveBlock(block.id, -1); });
+    controls.querySelector(".down-btn").addEventListener("click", function () { moveBlock(block.id, 1); });
+    controls.querySelector(".remove-btn").addEventListener("click", function () { removeBlock(block.id); });
+    return controls;
+  }
+
+  function buildListBlock(block, markerFn) {
+    var wrap = document.createElement("div");
+    (block.items || []).forEach(function (item, idx) {
+      var row = document.createElement("div");
+      row.className = "list-item-row";
+
+      if (block.type === "task") {
+        var check = document.createElement("button");
+        check.type = "button";
+        check.className = "checklist-item-check" + (item.checked ? " checked" : "");
+        check.addEventListener("click", function () {
+          item.checked = !item.checked;
+          saveCurrentProject();
+          renderProjectBlocks();
+        });
+        row.appendChild(check);
+      } else {
+        var marker = document.createElement("span");
+        marker.className = "list-item-marker";
+        marker.textContent = markerFn(idx);
+        row.appendChild(marker);
+      }
+
+      var textInput = document.createElement("input");
+      textInput.type = "text";
+      textInput.className = "list-item-text" + (block.type === "task" && item.checked ? " task-done" : "");
+      textInput.placeholder = block.type === "task" ? "Task…" : "List item…";
+      textInput.value = item.text || "";
+      textInput.addEventListener("input", function () { item.text = textInput.value; saveCurrentProject(); });
+      row.appendChild(textInput);
+
+      var removeItemBtn = document.createElement("button");
+      removeItemBtn.type = "button";
+      removeItemBtn.className = "list-item-remove";
+      removeItemBtn.innerHTML = "&times;";
+      removeItemBtn.addEventListener("click", function () {
+        block.items = block.items.filter(function (it) { return it.id !== item.id; });
+        saveCurrentProject();
+        renderProjectBlocks();
+      });
+      row.appendChild(removeItemBtn);
+
+      wrap.appendChild(row);
+    });
+
+    var addItemBtn = document.createElement("button");
+    addItemBtn.type = "button";
+    addItemBtn.className = "list-add-item-btn";
+    addItemBtn.textContent = "+ Add item";
+    addItemBtn.addEventListener("click", function () {
+      if (!block.items) block.items = [];
+      var newItem = { id: uid(), text: "" };
+      if (block.type === "task") newItem.checked = false;
+      block.items.push(newItem);
+      saveCurrentProject();
+      renderProjectBlocks();
+    });
+    wrap.appendChild(addItemBtn);
+    return wrap;
+  }
+
+  function buildImageBlock(block) {
+    var wrap = document.createElement("div");
+    if (block.url) {
+      var img = document.createElement("img");
+      img.className = "block-image-preview";
+      img.src = block.url;
+      wrap.appendChild(img);
+      var caption = document.createElement("input");
+      caption.type = "text";
+      caption.className = "block-image-caption";
+      caption.placeholder = "Add a caption…";
+      caption.value = block.caption || "";
+      caption.addEventListener("input", function () { block.caption = caption.value; saveCurrentProject(); });
+      wrap.appendChild(caption);
+    } else {
+      var empty = document.createElement("div");
+      empty.className = "block-image-empty";
+      empty.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/></svg><span>Click to upload an image</span>';
+      empty.addEventListener("click", function () { triggerBlockUpload(block, "image"); });
+      wrap.appendChild(empty);
+    }
+    return wrap;
+  }
+
+  function buildFileBlock(block) {
+    var wrap = document.createElement("div");
+    if (block.url) {
+      var row = document.createElement("a");
+      row.className = "block-file-row";
+      row.href = block.url;
+      row.target = "_blank";
+      row.rel = "noopener";
+      row.innerHTML =
+        '<span class="block-file-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg></span>' +
+        '<span class="block-file-name">' + (block.filename || "File") + '</span>';
+      wrap.appendChild(row);
+    } else {
+      var empty = document.createElement("div");
+      empty.className = "block-file-empty";
+      empty.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg><span>Click to attach a file</span>';
+      empty.addEventListener("click", function () { triggerBlockUpload(block, "file"); });
+      wrap.appendChild(empty);
+    }
+    return wrap;
+  }
+
+  function buildLinkBlock(block) {
+    var wrap = document.createElement("div");
+    wrap.className = "block-link-row";
+    wrap.innerHTML = '<span class="block-link-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg></span>';
+    var inputs = document.createElement("div");
+    inputs.className = "block-link-inputs";
+
+    var labelInput = document.createElement("input");
+    labelInput.type = "text";
+    labelInput.className = "block-link-label-input";
+    labelInput.placeholder = "Link title";
+    labelInput.value = block.label || "";
+    labelInput.addEventListener("input", function () { block.label = labelInput.value; saveCurrentProject(); });
+
+    var urlInput = document.createElement("input");
+    urlInput.type = "text";
+    urlInput.className = "block-link-url-input";
+    urlInput.placeholder = "https://…";
+    urlInput.value = block.url || "";
+    urlInput.addEventListener("input", function () { block.url = urlInput.value; saveCurrentProject(); });
+
+    inputs.appendChild(labelInput);
+    inputs.appendChild(urlInput);
+    wrap.appendChild(inputs);
+    return wrap;
+  }
+
+  function buildTableBlock(block) {
+    var wrap = document.createElement("div");
+    wrap.className = "block-table-wrap";
+    if (!block.rows || block.rows.length === 0) block.rows = [["", ""], ["", ""]];
+
+    var table = document.createElement("table");
+    table.className = "block-table";
+    block.rows.forEach(function (row, rIdx) {
+      var tr = document.createElement("tr");
+      row.forEach(function (cell, cIdx) {
+        var td = document.createElement("td");
+        var input = document.createElement("input");
+        input.type = "text";
+        input.className = "block-table-cell";
+        input.value = cell || "";
+        input.addEventListener("input", function () {
+          block.rows[rIdx][cIdx] = input.value;
+          saveCurrentProject();
+        });
+        td.appendChild(input);
+        tr.appendChild(td);
+      });
+      table.appendChild(tr);
+    });
+    wrap.appendChild(table);
+
+    var controls = document.createElement("div");
+    controls.className = "block-table-controls";
+    var addRowBtn = document.createElement("button");
+    addRowBtn.type = "button";
+    addRowBtn.className = "block-table-add-btn";
+    addRowBtn.textContent = "+ Row";
+    addRowBtn.addEventListener("click", function () {
+      var cols = block.rows[0] ? block.rows[0].length : 2;
+      var newRow = [];
+      for (var i = 0; i < cols; i++) newRow.push("");
+      block.rows.push(newRow);
+      saveCurrentProject();
+      renderProjectBlocks();
+    });
+    var addColBtn = document.createElement("button");
+    addColBtn.type = "button";
+    addColBtn.className = "block-table-add-btn";
+    addColBtn.textContent = "+ Column";
+    addColBtn.addEventListener("click", function () {
+      block.rows.forEach(function (row) { row.push(""); });
+      saveCurrentProject();
+      renderProjectBlocks();
+    });
+    controls.appendChild(addRowBtn);
+    controls.appendChild(addColBtn);
+    wrap.appendChild(controls);
+    return wrap;
+  }
+
+  function triggerBlockUpload(block, kind) {
+    if (isGuest()) { openAuthGate("settings"); return; }
+    var input = document.createElement("input");
+    input.type = "file";
+    input.accept = kind === "image" ? "image/*" : "*/*";
+    input.addEventListener("change", function () {
+      var file = input.files[0];
+      if (!file) return;
+      if (file.size > 8 * 1024 * 1024) { alert("Please choose a file under 8MB."); return; }
+      var userId = state.session.user.id;
+      var bucket = kind === "image" ? "covers" : "project-files";
+      var path = userId + "/" + Date.now() + "-" + file.name.replace(/[^a-z0-9.]/gi, "_");
+      supabaseClient.storage.from(bucket).upload(path, file, { upsert: true }).then(function (res) {
+        if (res.error) { alert("Upload failed: " + res.error.message); return; }
+        var publicUrl = supabaseClient.storage.from(bucket).getPublicUrl(path).data.publicUrl;
+        block.url = publicUrl;
+        if (kind === "file") block.filename = file.name;
+        saveCurrentProject();
+        renderProjectBlocks();
+      });
+    });
+    input.click();
+  }
+
   function renderProjectBlocks() {
     var project = currentProject();
     var wrap = document.getElementById("project-blocks");
     if (!project || !wrap) return;
     wrap.innerHTML = "";
 
-    (project.content || []).forEach(function (block, index) {
+    (project.content || []).forEach(function (block) {
       var el = document.createElement("div");
       el.className = "content-block";
+      el.appendChild(buildBlockControls(block));
 
-      var controls = document.createElement("div");
-      controls.className = "block-controls";
-      controls.innerHTML =
-        '<button type="button" class="block-control-btn star-btn' + (block.starred ? " star-active" : "") + '" title="Save as reusable">★</button>' +
-        '<button type="button" class="block-control-btn up-btn" title="Move up">↑</button>' +
-        '<button type="button" class="block-control-btn down-btn" title="Move down">↓</button>' +
-        '<button type="button" class="block-control-btn remove-btn" title="Delete">&times;</button>';
-      controls.querySelector(".star-btn").addEventListener("click", function () { toggleBlockStar(block.id); });
-      controls.querySelector(".up-btn").addEventListener("click", function () { moveBlock(block.id, -1); });
-      controls.querySelector(".down-btn").addEventListener("click", function () { moveBlock(block.id, 1); });
-      controls.querySelector(".remove-btn").addEventListener("click", function () { removeBlock(block.id); });
-      el.appendChild(controls);
-
-      if (block.type === "heading") {
+      if (block.type === "title") {
+        var titleInput = document.createElement("input");
+        titleInput.type = "text";
+        titleInput.className = "block-title-input";
+        titleInput.placeholder = "Title";
+        titleInput.value = block.text || "";
+        titleInput.addEventListener("input", function () { block.text = titleInput.value; saveCurrentProject(); });
+        el.appendChild(titleInput);
+      } else if (block.type === "heading") {
         var hInput = document.createElement("input");
         hInput.type = "text";
         hInput.className = "block-heading-input";
@@ -1573,60 +1840,24 @@
         tInput.value = block.text || "";
         tInput.addEventListener("input", function () { block.text = tInput.value; saveCurrentProject(); });
         el.appendChild(tInput);
-      } else if (block.type === "checklist") {
-        var title = document.createElement("p");
-        title.className = "checklist-block-title";
-        title.textContent = "Checklist";
-        el.appendChild(title);
-
-        (block.items || []).forEach(function (item) {
-          var row = document.createElement("div");
-          row.className = "checklist-item-row";
-
-          var check = document.createElement("button");
-          check.type = "button";
-          check.className = "checklist-item-check" + (item.checked ? " checked" : "");
-          check.addEventListener("click", function () {
-            item.checked = !item.checked;
-            saveCurrentProject();
-            renderProjectBlocks();
-            renderProjectsList(); renderProjectsPreview();
-          });
-          row.appendChild(check);
-
-          var textInput = document.createElement("input");
-          textInput.type = "text";
-          textInput.className = "checklist-item-text";
-          textInput.placeholder = "List item…";
-          textInput.value = item.text || "";
-          textInput.addEventListener("input", function () { item.text = textInput.value; saveCurrentProject(); });
-          row.appendChild(textInput);
-
-          var removeItemBtn = document.createElement("button");
-          removeItemBtn.type = "button";
-          removeItemBtn.className = "checklist-item-remove";
-          removeItemBtn.innerHTML = "&times;";
-          removeItemBtn.addEventListener("click", function () {
-            block.items = block.items.filter(function (it) { return it.id !== item.id; });
-            saveCurrentProject();
-            renderProjectBlocks();
-          });
-          row.appendChild(removeItemBtn);
-
-          el.appendChild(row);
-        });
-
-        var addItemBtn = document.createElement("button");
-        addItemBtn.type = "button";
-        addItemBtn.className = "checklist-add-item-btn";
-        addItemBtn.textContent = "+ Add item";
-        addItemBtn.addEventListener("click", function () {
-          if (!block.items) block.items = [];
-          block.items.push({ id: uid(), text: "", checked: false });
-          saveCurrentProject();
-          renderProjectBlocks();
-        });
-        el.appendChild(addItemBtn);
+      } else if (block.type === "bulleted-list") {
+        el.appendChild(buildListBlock(block, function () { return "•"; }));
+      } else if (block.type === "numbered-list") {
+        el.appendChild(buildListBlock(block, function (idx) { return (idx + 1) + "."; }));
+      } else if (block.type === "task") {
+        el.appendChild(buildListBlock(block, null));
+      } else if (block.type === "divider") {
+        var hr = document.createElement("hr");
+        hr.className = "block-divider-line";
+        el.appendChild(hr);
+      } else if (block.type === "image") {
+        el.appendChild(buildImageBlock(block));
+      } else if (block.type === "file") {
+        el.appendChild(buildFileBlock(block));
+      } else if (block.type === "link") {
+        el.appendChild(buildLinkBlock(block));
+      } else if (block.type === "table") {
+        el.appendChild(buildTableBlock(block));
       }
 
       wrap.appendChild(el);
@@ -1654,10 +1885,22 @@
   function insertLibraryBlock(rb) {
     var project = currentProject();
     if (!project) return;
-    var block = { id: uid(), type: rb.type, starred: false };
-    if (rb.type === "checklist") {
-      block.items = (rb.content.items || []).map(function (it) { return { id: uid(), text: it.text, checked: false }; });
-    } else {
+    var block = Object.assign({ id: uid(), type: rb.type, starred: false }, defaultBlockContent(rb.type));
+    if (LIST_TYPES.indexOf(rb.type) !== -1) {
+      block.items = (rb.content.items || []).map(function (it) {
+        var copy = { id: uid(), text: it.text };
+        if (rb.type === "task") copy.checked = false;
+        return copy;
+      });
+    } else if (rb.type === "table") {
+      block.rows = (rb.content.rows || []).map(function (row) { return row.slice(); });
+    } else if (rb.type === "image") {
+      block.url = rb.content.url; block.caption = rb.content.caption;
+    } else if (rb.type === "file") {
+      block.url = rb.content.url; block.filename = rb.content.filename;
+    } else if (rb.type === "link") {
+      block.url = rb.content.url; block.label = rb.content.label;
+    } else if (rb.type !== "divider") {
       block.text = rb.content.text || "";
     }
     if (!project.content) project.content = [];
@@ -1909,9 +2152,25 @@
       project.subtitle = this.value;
       saveCurrentProject();
     });
-    document.querySelectorAll(".block-add-btn[data-block-type]").forEach(function (btn) {
-      btn.addEventListener("click", function () { addBlock(btn.getAttribute("data-block-type")); });
-    });
+    var addBlockMenuBtn = document.getElementById("add-block-menu-btn");
+    var addBlockMenu = document.getElementById("add-block-menu");
+    if (addBlockMenuBtn && addBlockMenu) {
+      addBlockMenuBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        addBlockMenu.classList.toggle("hidden");
+      });
+      document.addEventListener("click", function (e) {
+        if (!addBlockMenu.classList.contains("hidden") && !addBlockMenu.contains(e.target) && e.target !== addBlockMenuBtn) {
+          addBlockMenu.classList.add("hidden");
+        }
+      });
+      document.querySelectorAll(".add-block-menu-item[data-block-type]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          addBlock(btn.getAttribute("data-block-type"));
+          addBlockMenu.classList.add("hidden");
+        });
+      });
+    }
     document.getElementById("open-block-library-btn").addEventListener("click", function () {
       renderBlockLibrary();
       document.getElementById("block-library-modal").classList.remove("hidden");
