@@ -3,7 +3,7 @@
 
   var supabaseClient = null;
   try {
-    supabaseClient = window.supabase.createClient( "https://jcfqjltjnkocjmctnsth.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZnFqbHRqbmtvY2ptY3Ruc3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMTUwNTEsImV4cCI6MjA5OTU5MTA1MX0.t2U8GsWpm8J3HMj6nmFIwv5RA2dhaRrLo8YdcMnVP7M");
+    supabaseClient = window.supabase.createClient("https://jcfqjltjnkocjmctnsth.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpjZnFqbHRqbmtvY2ptY3Ruc3RoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQwMTUwNTEsImV4cCI6MjA5OTU5MTA1MX0.t2U8GsWpm8J3HMj6nmFIwv5RA2dhaRrLo8YdcMnVP7M");
   } catch (e) {
     console.error("Axis: failed to create Supabase client — check config.js", e);
   }
@@ -544,6 +544,8 @@
     document.querySelectorAll(".bottom-nav-item[data-page]").forEach(function (el) {
       el.classList.toggle("active", el.getAttribute("data-page") === pageId);
     });
+    var cluster = document.getElementById("topright-cluster");
+    if (cluster) cluster.classList.toggle("hidden", pageId !== "dashboard");
     window.scrollTo(0, 0);
   }
 
@@ -1437,16 +1439,94 @@
   }
 
   var saveProjectTimer = null;
+  var undoStack = [];
+  var redoStack = [];
+  var MAX_HISTORY = 50;
+
+  function snapshotContent() {
+    var project = currentProject();
+    return project ? JSON.parse(JSON.stringify(project.content || [])) : [];
+  }
+
+  function pushUndoSnapshot() {
+    undoStack.push(snapshotContent());
+    if (undoStack.length > MAX_HISTORY) undoStack.shift();
+    redoStack = [];
+    updateUndoRedoButtons();
+  }
+
+  function updateUndoRedoButtons() {
+    var undoBtn = document.getElementById("undo-btn");
+    var redoBtn = document.getElementById("redo-btn");
+    if (undoBtn) undoBtn.disabled = undoStack.length === 0;
+    if (redoBtn) redoBtn.disabled = redoStack.length === 0;
+  }
+
+  function undoBlockChange() {
+    var project = currentProject();
+    if (!project || undoStack.length === 0) return;
+    redoStack.push(snapshotContent());
+    project.content = undoStack.pop();
+    saveCurrentProject();
+    renderProjectBlocks();
+    updateUndoRedoButtons();
+  }
+
+  function redoBlockChange() {
+    var project = currentProject();
+    if (!project || redoStack.length === 0) return;
+    undoStack.push(snapshotContent());
+    project.content = redoStack.pop();
+    saveCurrentProject();
+    renderProjectBlocks();
+    updateUndoRedoButtons();
+  }
+
+  function resetBlockHistory() {
+    undoStack = [];
+    redoStack = [];
+    updateUndoRedoButtons();
+  }
+
+  function setSaveIndicator(status) {
+    var el = document.getElementById("save-indicator");
+    if (!el) return;
+    el.className = "save-indicator " + status;
+    if (status === "saving") el.textContent = "Saving…";
+    else if (status === "saved") el.textContent = "Saved";
+    else el.textContent = "";
+    if (status === "saved") {
+      setTimeout(function () {
+        if (el.className.indexOf("saved") !== -1) el.textContent = "";
+      }, 2000);
+    }
+  }
+
+  // Attach the "snapshot once per typing session" pattern to a text input,
+  // so undo reverts a whole edit session rather than one keystroke.
+  function wireUndoableInput(inputEl, onChange) {
+    var snapshotTaken = false;
+    inputEl.addEventListener("focus", function () { snapshotTaken = false; });
+    inputEl.addEventListener("input", function () {
+      if (!snapshotTaken) { pushUndoSnapshot(); snapshotTaken = true; }
+      onChange();
+      setSaveIndicator("saving");
+      saveCurrentProject();
+    });
+  }
+
   function saveCurrentProject() {
     var project = currentProject();
     if (!project) return;
     // Write to IndexedDB immediately (offline-first)
     if (offlineReady) AxisOffline.put("projects", project);
+    setSaveIndicator("saving");
     clearTimeout(saveProjectTimer);
     saveProjectTimer = setTimeout(function () {
-      if (isGuest()) return;
+      if (isGuest()) { setSaveIndicator("saved"); return; }
       if (!navigator.onLine) {
         enqueueIfOffline("projects", "upsert", { id: project.id, name: project.name, subtitle: project.subtitle, content: project.content, cover_url: project.cover_url, icon: project.icon, user_id: state.session && state.session.user.id });
+        setSaveIndicator("saved");
         return;
       }
       supabaseClient.from("projects").update({ name: project.name, subtitle: project.subtitle, content: project.content, cover_url: project.cover_url, icon: project.icon })
@@ -1454,6 +1534,7 @@
           if (res.error) {
             enqueueIfOffline("projects", "upsert", { id: project.id, name: project.name, subtitle: project.subtitle, content: project.content, cover_url: project.cover_url, icon: project.icon, user_id: state.session && state.session.user.id });
           }
+          setSaveIndicator("saved");
         });
     }, 500);
   }
@@ -1466,6 +1547,8 @@
     if (!project) return;
     document.getElementById("project-name-input").value = project.name || "";
     document.getElementById("project-subtitle-input").value = project.subtitle || "";
+    resetBlockHistory();
+    setSaveIndicator("idle");
     renderProjectBlocks();
     renderProjectOfflineToggle();
     renderProjectCover();
@@ -1500,6 +1583,7 @@
   function addBlock(type) {
     var project = currentProject();
     if (!project) return;
+    pushUndoSnapshot();
     var block = Object.assign({ id: uid(), type: type, starred: false }, defaultBlockContent(type));
     if (!project.content) project.content = [];
     project.content.push(block);
@@ -1507,23 +1591,54 @@
     renderProjectBlocks();
   }
 
+  function addBlockAt(type, index) {
+    var project = currentProject();
+    if (!project) return;
+    pushUndoSnapshot();
+    var block = Object.assign({ id: uid(), type: type, starred: false }, defaultBlockContent(type));
+    if (!project.content) project.content = [];
+    project.content.splice(index, 0, block);
+    saveCurrentProject();
+    renderProjectBlocks();
+  }
+
   function removeBlock(blockId) {
     var project = currentProject();
     if (!project) return;
+    pushUndoSnapshot();
     project.content = project.content.filter(function (b) { return b.id !== blockId; });
     saveCurrentProject();
     renderProjectBlocks();
   }
 
-  function moveBlock(blockId, dir) {
+  function duplicateBlock(blockId) {
     var project = currentProject();
     if (!project) return;
     var idx = project.content.findIndex(function (b) { return b.id === blockId; });
-    var newIdx = idx + dir;
-    if (newIdx < 0 || newIdx >= project.content.length) return;
-    var tmp = project.content[idx];
-    project.content[idx] = project.content[newIdx];
-    project.content[newIdx] = tmp;
+    if (idx === -1) return;
+    pushUndoSnapshot();
+    var clone = JSON.parse(JSON.stringify(project.content[idx]));
+    clone.id = uid();
+    clone.starred = false;
+    delete clone.reusableId;
+    if (clone.items) clone.items.forEach(function (it) { it.id = uid(); });
+    project.content.splice(idx + 1, 0, clone);
+    saveCurrentProject();
+    renderProjectBlocks();
+  }
+
+  function reorderBlock(draggedId, targetId, before) {
+    var project = currentProject();
+    if (!project) return;
+    var content = project.content;
+    var fromIdx = content.findIndex(function (b) { return b.id === draggedId; });
+    if (fromIdx === -1) return;
+    pushUndoSnapshot();
+    var item = content.splice(fromIdx, 1)[0];
+    var toIdx = content.findIndex(function (b) { return b.id === targetId; });
+    if (toIdx === -1) toIdx = content.length;
+    else if (!before) toIdx++;
+    content.splice(toIdx, 0, item);
     saveCurrentProject();
     renderProjectBlocks();
   }
@@ -1582,13 +1697,12 @@
     var controls = document.createElement("div");
     controls.className = "block-controls";
     controls.innerHTML =
+      '<button type="button" class="block-control-btn block-drag-handle" title="Drag to reorder">⠿</button>' +
       '<button type="button" class="block-control-btn star-btn' + (block.starred ? " star-active" : "") + '" title="Save as reusable">★</button>' +
-      '<button type="button" class="block-control-btn up-btn" title="Move up">↑</button>' +
-      '<button type="button" class="block-control-btn down-btn" title="Move down">↓</button>' +
+      '<button type="button" class="block-control-btn duplicate-btn" title="Duplicate">⧉</button>' +
       '<button type="button" class="block-control-btn remove-btn" title="Delete">&times;</button>';
     controls.querySelector(".star-btn").addEventListener("click", function () { toggleBlockStar(block.id); });
-    controls.querySelector(".up-btn").addEventListener("click", function () { moveBlock(block.id, -1); });
-    controls.querySelector(".down-btn").addEventListener("click", function () { moveBlock(block.id, 1); });
+    controls.querySelector(".duplicate-btn").addEventListener("click", function () { duplicateBlock(block.id); });
     controls.querySelector(".remove-btn").addEventListener("click", function () { removeBlock(block.id); });
     return controls;
   }
@@ -1604,6 +1718,7 @@
         check.type = "button";
         check.className = "checklist-item-check" + (item.checked ? " checked" : "");
         check.addEventListener("click", function () {
+          pushUndoSnapshot();
           item.checked = !item.checked;
           saveCurrentProject();
           renderProjectBlocks();
@@ -1621,7 +1736,7 @@
       textInput.className = "list-item-text" + (block.type === "task" && item.checked ? " task-done" : "");
       textInput.placeholder = block.type === "task" ? "Task…" : "List item…";
       textInput.value = item.text || "";
-      textInput.addEventListener("input", function () { item.text = textInput.value; saveCurrentProject(); });
+      wireUndoableInput(textInput, function () { item.text = textInput.value; });
       row.appendChild(textInput);
 
       var removeItemBtn = document.createElement("button");
@@ -1629,6 +1744,7 @@
       removeItemBtn.className = "list-item-remove";
       removeItemBtn.innerHTML = "&times;";
       removeItemBtn.addEventListener("click", function () {
+        pushUndoSnapshot();
         block.items = block.items.filter(function (it) { return it.id !== item.id; });
         saveCurrentProject();
         renderProjectBlocks();
@@ -1643,6 +1759,7 @@
     addItemBtn.className = "list-add-item-btn";
     addItemBtn.textContent = "+ Add item";
     addItemBtn.addEventListener("click", function () {
+      pushUndoSnapshot();
       if (!block.items) block.items = [];
       var newItem = { id: uid(), text: "" };
       if (block.type === "task") newItem.checked = false;
@@ -1712,14 +1829,14 @@
     labelInput.className = "block-link-label-input";
     labelInput.placeholder = "Link title";
     labelInput.value = block.label || "";
-    labelInput.addEventListener("input", function () { block.label = labelInput.value; saveCurrentProject(); });
+    wireUndoableInput(labelInput, function () { block.label = labelInput.value; });
 
     var urlInput = document.createElement("input");
     urlInput.type = "text";
     urlInput.className = "block-link-url-input";
     urlInput.placeholder = "https://…";
     urlInput.value = block.url || "";
-    urlInput.addEventListener("input", function () { block.url = urlInput.value; saveCurrentProject(); });
+    wireUndoableInput(urlInput, function () { block.url = urlInput.value; });
 
     inputs.appendChild(labelInput);
     inputs.appendChild(urlInput);
@@ -1742,10 +1859,7 @@
         input.type = "text";
         input.className = "block-table-cell";
         input.value = cell || "";
-        input.addEventListener("input", function () {
-          block.rows[rIdx][cIdx] = input.value;
-          saveCurrentProject();
-        });
+        wireUndoableInput(input, function () { block.rows[rIdx][cIdx] = input.value; });
         td.appendChild(input);
         tr.appendChild(td);
       });
@@ -1760,6 +1874,7 @@
     addRowBtn.className = "block-table-add-btn";
     addRowBtn.textContent = "+ Row";
     addRowBtn.addEventListener("click", function () {
+      pushUndoSnapshot();
       var cols = block.rows[0] ? block.rows[0].length : 2;
       var newRow = [];
       for (var i = 0; i < cols; i++) newRow.push("");
@@ -1772,6 +1887,7 @@
     addColBtn.className = "block-table-add-btn";
     addColBtn.textContent = "+ Column";
     addColBtn.addEventListener("click", function () {
+      pushUndoSnapshot();
       block.rows.forEach(function (row) { row.push(""); });
       saveCurrentProject();
       renderProjectBlocks();
@@ -1806,15 +1922,39 @@
     input.click();
   }
 
+  function buildInsertRow(index) {
+    var row = document.createElement("div");
+    row.className = "block-insert-row editor-only";
+    row.innerHTML =
+      '<span class="block-insert-line"></span>' +
+      '<button type="button" class="block-insert-btn" title="Insert block">+</button>' +
+      '<span class="block-insert-line"></span>';
+    row.querySelector(".block-insert-btn").addEventListener("click", function (e) {
+      openInsertMenu(e.currentTarget, index);
+    });
+    return row;
+  }
+
   function renderProjectBlocks() {
     var project = currentProject();
     var wrap = document.getElementById("project-blocks");
+    var emptyState = document.getElementById("project-empty-state");
+    var toolbar = document.getElementById("block-toolbar");
     if (!project || !wrap) return;
-    wrap.innerHTML = "";
 
-    (project.content || []).forEach(function (block) {
+    var hasBlocks = (project.content || []).length > 0;
+    if (emptyState) emptyState.classList.toggle("hidden", hasBlocks);
+    if (toolbar) toolbar.classList.toggle("hidden", !hasBlocks);
+    wrap.classList.toggle("hidden", !hasBlocks);
+    if (!hasBlocks) return;
+
+    wrap.innerHTML = "";
+    wrap.appendChild(buildInsertRow(0));
+
+    (project.content || []).forEach(function (block, index) {
       var el = document.createElement("div");
       el.className = "content-block";
+      el.setAttribute("data-block-id", block.id);
       el.appendChild(buildBlockControls(block));
 
       if (block.type === "title") {
@@ -1823,7 +1963,7 @@
         titleInput.className = "block-title-input";
         titleInput.placeholder = "Title";
         titleInput.value = block.text || "";
-        titleInput.addEventListener("input", function () { block.text = titleInput.value; saveCurrentProject(); });
+        wireUndoableInput(titleInput, function () { block.text = titleInput.value; });
         el.appendChild(titleInput);
       } else if (block.type === "heading") {
         var hInput = document.createElement("input");
@@ -1831,14 +1971,14 @@
         hInput.className = "block-heading-input";
         hInput.placeholder = "Heading";
         hInput.value = block.text || "";
-        hInput.addEventListener("input", function () { block.text = hInput.value; saveCurrentProject(); });
+        wireUndoableInput(hInput, function () { block.text = hInput.value; });
         el.appendChild(hInput);
       } else if (block.type === "text") {
         var tInput = document.createElement("textarea");
         tInput.className = "block-text-input";
         tInput.placeholder = "Write something…";
         tInput.value = block.text || "";
-        tInput.addEventListener("input", function () { block.text = tInput.value; saveCurrentProject(); });
+        wireUndoableInput(tInput, function () { block.text = tInput.value; });
         el.appendChild(tInput);
       } else if (block.type === "bulleted-list") {
         el.appendChild(buildListBlock(block, function () { return "•"; }));
@@ -1861,7 +2001,10 @@
       }
 
       wrap.appendChild(el);
+      wrap.appendChild(buildInsertRow(index + 1));
     });
+
+    applyViewEditMode();
   }
 
   function renderBlockLibrary() {
@@ -1908,6 +2051,130 @@
     saveCurrentProject();
     renderProjectBlocks();
     document.getElementById("block-library-modal").classList.add("hidden");
+  }
+
+  // ==================== INSERT-BETWEEN-BLOCKS MENU ====================
+
+  var pendingInsertIndex = null;
+
+  function openInsertMenu(anchorBtn, index) {
+    var menu = document.getElementById("insert-block-menu");
+    var rect = anchorBtn.getBoundingClientRect();
+    menu.style.top = (rect.bottom + 4) + "px";
+    menu.style.left = Math.max(8, rect.left - 90) + "px";
+    pendingInsertIndex = index;
+    menu.classList.remove("hidden");
+    anchorBtn.closest(".block-insert-row").classList.add("menu-open");
+  }
+
+  function closeInsertMenu() {
+    var menu = document.getElementById("insert-block-menu");
+    menu.classList.add("hidden");
+    document.querySelectorAll(".block-insert-row.menu-open").forEach(function (r) { r.classList.remove("menu-open"); });
+    pendingInsertIndex = null;
+  }
+
+  function initInsertMenu() {
+    document.querySelectorAll("#insert-block-menu .add-block-menu-item").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        if (pendingInsertIndex !== null) addBlockAt(btn.getAttribute("data-block-type"), pendingInsertIndex);
+        closeInsertMenu();
+      });
+    });
+    document.addEventListener("click", function (e) {
+      var menu = document.getElementById("insert-block-menu");
+      if (!menu.classList.contains("hidden") && !menu.contains(e.target) && !e.target.closest(".block-insert-btn")) {
+        closeInsertMenu();
+      }
+    });
+  }
+
+  // ==================== VIEW / EDIT MODE ====================
+
+  var projectEditMode = "edit";
+
+  function applyViewEditMode() {
+    document.body.classList.toggle("project-view-mode", projectEditMode === "view");
+  }
+
+  function initViewEditToggle() {
+    document.querySelectorAll(".ve-toggle-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        projectEditMode = btn.getAttribute("data-mode");
+        document.querySelectorAll(".ve-toggle-btn").forEach(function (b) { b.classList.remove("active"); });
+        btn.classList.add("active");
+        applyViewEditMode();
+      });
+    });
+  }
+
+  // ==================== UNDO / REDO WIRING ====================
+
+  function initUndoRedo() {
+    document.getElementById("undo-btn").addEventListener("click", undoBlockChange);
+    document.getElementById("redo-btn").addEventListener("click", redoBlockChange);
+    document.addEventListener("keydown", function (e) {
+      var detailVisible = !document.getElementById("project-detail-view").classList.contains("hidden");
+      if (!detailVisible) return;
+      var mod = e.ctrlKey || e.metaKey;
+      if (!mod) return;
+      if (e.key.toLowerCase() === "z" && !e.shiftKey) { e.preventDefault(); undoBlockChange(); }
+      else if (e.key.toLowerCase() === "y" || (e.key.toLowerCase() === "z" && e.shiftKey)) { e.preventDefault(); redoBlockChange(); }
+    });
+  }
+
+  // ==================== DRAG & DROP REORDERING (pointer-based, mouse + touch) ====================
+
+  function initBlockDragAndDrop() {
+    var wrap = document.getElementById("project-blocks");
+    if (!wrap) return;
+
+    wrap.addEventListener("pointerdown", function (e) {
+      var handle = e.target.closest(".block-drag-handle");
+      if (!handle) return;
+      var blockEl = handle.closest(".content-block");
+      if (!blockEl) return;
+      var draggingId = blockEl.getAttribute("data-block-id");
+      blockEl.classList.add("dragging");
+      e.preventDefault();
+
+      function clearIndicators() {
+        wrap.querySelectorAll(".content-block").forEach(function (b) {
+          b.classList.remove("drag-over-top", "drag-over-bottom");
+        });
+      }
+
+      function onMove(ev) {
+        var point = ev.touches ? ev.touches[0] : ev;
+        var target = document.elementFromPoint(point.clientX, point.clientY);
+        var overBlock = target && target.closest(".content-block");
+        clearIndicators();
+        if (overBlock && overBlock !== blockEl) {
+          var rect = overBlock.getBoundingClientRect();
+          var midpoint = rect.top + rect.height / 2;
+          overBlock.classList.add(point.clientY < midpoint ? "drag-over-top" : "drag-over-bottom");
+        }
+      }
+
+      function onUp(ev) {
+        document.removeEventListener("pointermove", onMove);
+        document.removeEventListener("pointerup", onUp);
+        blockEl.classList.remove("dragging");
+        var point = ev.changedTouches ? ev.changedTouches[0] : ev;
+        var target = document.elementFromPoint(point.clientX, point.clientY);
+        var overBlock = target && target.closest(".content-block");
+        clearIndicators();
+        if (overBlock && overBlock !== blockEl) {
+          var targetId = overBlock.getAttribute("data-block-id");
+          var rect = overBlock.getBoundingClientRect();
+          var before = point.clientY < rect.top + rect.height / 2;
+          reorderBlock(draggingId, targetId, before);
+        }
+      }
+
+      document.addEventListener("pointermove", onMove);
+      document.addEventListener("pointerup", onUp);
+    });
   }
 
   // ==================== FOCUS TIMER ====================
@@ -2164,13 +2431,34 @@
           addBlockMenu.classList.add("hidden");
         }
       });
-      document.querySelectorAll(".add-block-menu-item[data-block-type]").forEach(function (btn) {
+      addBlockMenu.querySelectorAll(".add-block-menu-item[data-block-type]").forEach(function (btn) {
         btn.addEventListener("click", function () {
           addBlock(btn.getAttribute("data-block-type"));
           addBlockMenu.classList.add("hidden");
         });
       });
     }
+
+    var emptyAddBtn = document.getElementById("empty-add-block-btn");
+    var emptyAddMenu = document.getElementById("empty-add-block-menu");
+    if (emptyAddBtn && emptyAddMenu) {
+      emptyAddBtn.addEventListener("click", function (e) {
+        e.stopPropagation();
+        emptyAddMenu.classList.toggle("hidden");
+      });
+      document.addEventListener("click", function (e) {
+        if (!emptyAddMenu.classList.contains("hidden") && !emptyAddMenu.contains(e.target) && e.target !== emptyAddBtn) {
+          emptyAddMenu.classList.add("hidden");
+        }
+      });
+      emptyAddMenu.querySelectorAll(".add-block-menu-item[data-block-type]").forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          addBlock(btn.getAttribute("data-block-type"));
+          emptyAddMenu.classList.add("hidden");
+        });
+      });
+    }
+
     document.getElementById("open-block-library-btn").addEventListener("click", function () {
       renderBlockLibrary();
       document.getElementById("block-library-modal").classList.remove("hidden");
@@ -2178,6 +2466,11 @@
     document.getElementById("close-block-library-btn").addEventListener("click", function () {
       document.getElementById("block-library-modal").classList.add("hidden");
     });
+
+    initInsertMenu();
+    initViewEditToggle();
+    initUndoRedo();
+    initBlockDragAndDrop();
   }
 
   var dashRange = "daily";
