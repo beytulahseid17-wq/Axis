@@ -3585,3 +3585,166 @@ body.dark-theme .offline-banner { background: #1E2D50; border-color: #3B5999; co
 }
 
 .icon-picker-option:hover { border-color: var(--accent); background: var(--accent-soft); }
+
+/* ============ Project editor toolbar row ============ */
+
+.project-toolbar-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.project-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.save-indicator {
+  font-size: 0.74rem;
+  color: var(--text-muted);
+  min-width: 50px;
+  text-align: right;
+  transition: opacity 0.3s ease;
+}
+
+.save-indicator.saving { color: var(--gold); }
+.save-indicator.saved { color: var(--accent); }
+
+.editor-icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.editor-icon-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.editor-icon-btn:disabled { opacity: 0.35; cursor: default; }
+
+.view-edit-toggle {
+  display: flex;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.2rem;
+  margin-left: 0.3rem;
+}
+
+.ve-toggle-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 0.3rem 0.8rem;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.ve-toggle-btn.active { background: var(--surface); color: var(--accent); box-shadow: var(--shadow-sm); }
+
+/* Hide editor-only chrome in View mode */
+body.project-view-mode .editor-only { display: none !important; }
+body.project-view-mode .block-controls { display: none !important; }
+body.project-view-mode .block-insert-row { display: none !important; }
+body.project-view-mode .block-title-input,
+body.project-view-mode .block-heading-input,
+body.project-view-mode .block-text-input,
+body.project-view-mode .list-item-text,
+body.project-view-mode .block-table-cell,
+body.project-view-mode .block-link-label-input,
+body.project-view-mode .block-link-url-input,
+body.project-view-mode .block-image-caption,
+body.project-view-mode .project-name-input,
+body.project-view-mode .project-subtitle-input {
+  pointer-events: none;
+}
+body.project-view-mode .content-block { padding-left: 0.4rem; }
+body.project-view-mode .content-block:hover { background: none; }
+
+/* ============ Empty state ============ */
+
+.project-empty-state {
+  padding: 2.5rem 0;
+  text-align: center;
+}
+
+.empty-add-block-btn {
+  background: var(--surface-2);
+  border: 1.5px dashed var(--line);
+  color: var(--text-muted);
+  border-radius: 12px;
+  padding: 0.9rem 1.6rem;
+  font-size: 0.88rem;
+  cursor: pointer;
+}
+
+.empty-add-block-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ============ Drag handle ============ */
+
+.block-drag-handle {
+  cursor: grab;
+  touch-action: none;
+}
+
+.block-drag-handle:active { cursor: grabbing; }
+
+.content-block.dragging {
+  opacity: 0.4;
+}
+
+.content-block.drag-over-top { box-shadow: inset 0 2px 0 var(--accent); }
+.content-block.drag-over-bottom { box-shadow: inset 0 -2px 0 var(--accent); }
+
+/* ============ Between-block insert control ============ */
+
+.block-insert-row {
+  display: flex;
+  align-items: center;
+  height: 14px;
+  position: relative;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.block-insert-row:hover,
+.block-insert-row.menu-open { opacity: 1; }
+
+.block-insert-line {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.block-insert-btn {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin: 0 0.4rem;
+}
+
+#insert-block-menu {
+  position: fixed;
+  top: auto;
+  left: auto;
+}
