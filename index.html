@@ -411,18 +411,33 @@
 
         <div id="project-detail-view" class="hidden">
 
-          <a href="#" class="back-link" id="project-back-link">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-            All Projects
-          </a>
+          <div class="project-toolbar-row">
+            <a href="#" class="back-link" id="project-back-link">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+              All Projects
+            </a>
+            <div class="project-toolbar-actions">
+              <span class="save-indicator" id="save-indicator"></span>
+              <button type="button" class="editor-icon-btn" id="undo-btn" title="Undo" disabled>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-15-6.7L3 13"/></svg>
+              </button>
+              <button type="button" class="editor-icon-btn" id="redo-btn" title="Redo" disabled>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 15-6.7L21 13"/></svg>
+              </button>
+              <div class="view-edit-toggle" id="view-edit-toggle">
+                <button type="button" class="ve-toggle-btn active" data-mode="edit">Edit</button>
+                <button type="button" class="ve-toggle-btn" data-mode="view">View</button>
+              </div>
+            </div>
+          </div>
 
           <!-- Cover + icon -->
           <div class="project-cover-bar" id="project-cover-bar">
-            <button type="button" class="project-cover-edit-btn" id="project-cover-edit-btn">
+            <button type="button" class="project-cover-edit-btn editor-only" id="project-cover-edit-btn">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5z"/></svg>
               Add cover
             </button>
-            <button type="button" class="project-icon-badge" id="project-icon-badge" aria-label="Change icon">
+            <button type="button" class="project-icon-badge editor-only" id="project-icon-badge" aria-label="Change icon">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
             </button>
           </div>
@@ -433,7 +448,7 @@
           </div>
 
           <!-- Offline toggle for this project -->
-          <div class="project-offline-row" id="project-offline-row">
+          <div class="project-offline-row editor-only" id="project-offline-row">
             <div class="project-offline-info">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 15a4 4 0 0 0 4 4h9a5 5 0 1 0-.1-9.999 5.002 5.002 0 0 0-9.78 2.096A4.001 4.001 0 0 0 3 15z"/></svg>
               <span id="project-offline-label">Make available offline</span>
@@ -442,7 +457,7 @@
             <button type="button" class="offline-toggle-btn" id="project-offline-toggle">Enable</button>
           </div>
 
-          <div class="block-toolbar">
+          <div class="block-toolbar editor-only" id="block-toolbar">
             <div class="add-block-wrap">
               <button type="button" class="block-add-btn" id="add-block-menu-btn">+ Add block</button>
               <div id="add-block-menu" class="add-block-menu hidden">
@@ -462,9 +477,42 @@
             <button type="button" class="block-add-btn library-btn" id="open-block-library-btn">★ Insert from Library</button>
           </div>
 
+          <div id="project-empty-state" class="project-empty-state hidden">
+            <div class="add-block-wrap">
+              <button type="button" class="empty-add-block-btn" id="empty-add-block-btn">+ Add block</button>
+              <div id="empty-add-block-menu" class="add-block-menu hidden">
+                <button type="button" class="add-block-menu-item" data-block-type="title"><span class="abm-icon">T</span>Title</button>
+                <button type="button" class="add-block-menu-item" data-block-type="heading"><span class="abm-icon">H</span>Heading</button>
+                <button type="button" class="add-block-menu-item" data-block-type="text"><span class="abm-icon">¶</span>Text</button>
+                <button type="button" class="add-block-menu-item" data-block-type="bulleted-list"><span class="abm-icon">•</span>Bulleted list</button>
+                <button type="button" class="add-block-menu-item" data-block-type="numbered-list"><span class="abm-icon">1.</span>Numbered list</button>
+                <button type="button" class="add-block-menu-item" data-block-type="task"><span class="abm-icon">✓</span>Task</button>
+                <button type="button" class="add-block-menu-item" data-block-type="divider"><span class="abm-icon">—</span>Divider</button>
+                <button type="button" class="add-block-menu-item" data-block-type="image"><span class="abm-icon">▢</span>Image</button>
+                <button type="button" class="add-block-menu-item" data-block-type="file"><span class="abm-icon">⎘</span>File</button>
+                <button type="button" class="add-block-menu-item" data-block-type="link"><span class="abm-icon">⚭</span>Link</button>
+                <button type="button" class="add-block-menu-item" data-block-type="table"><span class="abm-icon">▦</span>Table</button>
+              </div>
+            </div>
+          </div>
+
           <div id="project-blocks" class="project-blocks"></div>
         </div>
       </section>
+
+      <div id="insert-block-menu" class="add-block-menu hidden">
+        <button type="button" class="add-block-menu-item" data-block-type="title"><span class="abm-icon">T</span>Title</button>
+        <button type="button" class="add-block-menu-item" data-block-type="heading"><span class="abm-icon">H</span>Heading</button>
+        <button type="button" class="add-block-menu-item" data-block-type="text"><span class="abm-icon">¶</span>Text</button>
+        <button type="button" class="add-block-menu-item" data-block-type="bulleted-list"><span class="abm-icon">•</span>Bulleted list</button>
+        <button type="button" class="add-block-menu-item" data-block-type="numbered-list"><span class="abm-icon">1.</span>Numbered list</button>
+        <button type="button" class="add-block-menu-item" data-block-type="task"><span class="abm-icon">✓</span>Task</button>
+        <button type="button" class="add-block-menu-item" data-block-type="divider"><span class="abm-icon">—</span>Divider</button>
+        <button type="button" class="add-block-menu-item" data-block-type="image"><span class="abm-icon">▢</span>Image</button>
+        <button type="button" class="add-block-menu-item" data-block-type="file"><span class="abm-icon">⎘</span>File</button>
+        <button type="button" class="add-block-menu-item" data-block-type="link"><span class="abm-icon">⚭</span>Link</button>
+        <button type="button" class="add-block-menu-item" data-block-type="table"><span class="abm-icon">▦</span>Table</button>
+      </div>
 
       <div id="block-library-modal" class="auth-gate hidden">
         <div class="auth-gate-card">
