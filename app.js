@@ -1344,24 +1344,47 @@
     document.getElementById("dash-quote-author").textContent = "— " + q.author;
   }
 
+  function recentProjects() {
+    return state.projects.slice().sort(function (a, b) {
+      var aT = a.last_opened_at || a.created_at || "";
+      var bT = b.last_opened_at || b.created_at || "";
+      return bT.localeCompare(aT);
+    }).slice(0, 4);
+  }
+
+  function buildRecentProjectCard(p) {
+    var card = document.createElement("div");
+    card.className = "recent-project-card";
+
+    var cover = document.createElement("div");
+    cover.className = "recent-project-cover";
+    if (p.cover_url) cover.style.backgroundImage = "url(" + p.cover_url + ")";
+
+    var icon = document.createElement("div");
+    icon.className = "recent-project-icon";
+    icon.innerHTML = iconSvg(p.icon);
+    cover.appendChild(icon);
+    card.appendChild(cover);
+
+    var name = document.createElement("div");
+    name.className = "recent-project-name";
+    name.textContent = p.name || "Untitled project";
+    card.appendChild(name);
+
+    card.addEventListener("click", function () { goToPage("projects"); openProjectDetail(p.id); });
+    return card;
+  }
+
   function renderProjectsPreview() {
-    var wrap = document.getElementById("dash-projects-preview");
-    if (!wrap) return;
-    if (state.projects.length === 0) {
-      wrap.innerHTML = '<p class="empty-note">No projects yet.</p>';
-      return;
-    }
-    wrap.innerHTML = "";
-    state.projects.slice(0, 4).forEach(function (p) {
-      var pct = projectProgress(p);
-      var row = document.createElement("div");
-      row.className = "dash-project-row";
-      row.innerHTML =
-        '<span class="dash-project-row-icon"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>' +
-        '<span><span class="dash-project-row-name">' + (p.name || "Untitled project") + '</span><br><span class="dash-project-row-sub">' + (p.subtitle || "No description") + '</span></span>' +
-        '<span class="dash-project-row-pct">' + pct + '%</span>';
-      row.addEventListener("click", function () { goToPage("projects"); openProjectDetail(p.id); });
-      wrap.appendChild(row);
+    var recents = recentProjects();
+    [document.getElementById("dash-projects-preview"), document.getElementById("dash-recent-projects-mobile")].forEach(function (wrap) {
+      if (!wrap) return;
+      if (recents.length === 0) {
+        wrap.innerHTML = '<p class="empty-note">No projects yet.</p>';
+        return;
+      }
+      wrap.innerHTML = "";
+      recents.forEach(function (p) { wrap.appendChild(buildRecentProjectCard(p)); });
     });
   }
 
@@ -1518,6 +1541,7 @@
   function saveCurrentProject() {
     var project = currentProject();
     if (!project) return;
+    project.last_opened_at = new Date().toISOString();
     // Write to IndexedDB immediately (offline-first)
     if (offlineReady) AxisOffline.put("projects", project);
     setSaveIndicator("saving");
@@ -1525,14 +1549,14 @@
     saveProjectTimer = setTimeout(function () {
       if (isGuest()) { setSaveIndicator("saved"); return; }
       if (!navigator.onLine) {
-        enqueueIfOffline("projects", "upsert", { id: project.id, name: project.name, subtitle: project.subtitle, content: project.content, cover_url: project.cover_url, icon: project.icon, user_id: state.session && state.session.user.id });
+        enqueueIfOffline("projects", "upsert", { id: project.id, name: project.name, subtitle: project.subtitle, content: project.content, cover_url: project.cover_url, icon: project.icon, last_opened_at: project.last_opened_at, user_id: state.session && state.session.user.id });
         setSaveIndicator("saved");
         return;
       }
-      supabaseClient.from("projects").update({ name: project.name, subtitle: project.subtitle, content: project.content, cover_url: project.cover_url, icon: project.icon })
+      supabaseClient.from("projects").update({ name: project.name, subtitle: project.subtitle, content: project.content, cover_url: project.cover_url, icon: project.icon, last_opened_at: project.last_opened_at })
         .eq("id", project.id).then(function (res) {
           if (res.error) {
-            enqueueIfOffline("projects", "upsert", { id: project.id, name: project.name, subtitle: project.subtitle, content: project.content, cover_url: project.cover_url, icon: project.icon, user_id: state.session && state.session.user.id });
+            enqueueIfOffline("projects", "upsert", { id: project.id, name: project.name, subtitle: project.subtitle, content: project.content, cover_url: project.cover_url, icon: project.icon, last_opened_at: project.last_opened_at, user_id: state.session && state.session.user.id });
           }
           setSaveIndicator("saved");
         });
@@ -1552,6 +1576,13 @@
     renderProjectBlocks();
     renderProjectOfflineToggle();
     renderProjectCover();
+
+    project.last_opened_at = new Date().toISOString();
+    if (offlineReady) AxisOffline.put("projects", project);
+    if (!isGuest() && navigator.onLine) {
+      supabaseClient.from("projects").update({ last_opened_at: project.last_opened_at }).eq("id", project.id)
+        .then(function (res) { if (res.error) console.error("Axis: last_opened_at update failed", res.error); });
+    }
   }
 
   function closeProjectDetail() {
