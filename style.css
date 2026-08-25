@@ -3835,3 +3835,91 @@ body.project-view-mode .content-block:hover { background: none; }
 @media (max-width: 1200px) and (min-width: 861px) {
   .recent-projects-grid { grid-template-columns: 1fr; }
 }
+
+/* ============ Projects tabs (Active/Archived) ============ */
+
+.projects-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin: 1rem 0 0.5rem;
+}
+
+.projects-tab {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  border-radius: 999px;
+  padding: 0.4rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.projects-tab.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+
+/* ============ Project ⋯ dots menu (shared, card + detail view) ============ */
+
+.project-menu-wrap { position: relative; }
+
+.project-dots-menu {
+  position: fixed;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.14);
+  padding: 0.35rem;
+  min-width: 170px;
+  z-index: 45;
+}
+
+.project-dots-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-size: 0.84rem;
+  padding: 0.55rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.project-dots-item:hover { background: var(--surface-2); }
+.project-dots-item.danger { color: var(--physical); }
+.project-dots-item.danger:hover { background: #FEE2E2; }
+
+.pdi-icon { flex-shrink: 0; }
+
+/* Card ⋯ trigger button, top-right of each project card */
+.project-card-menu-btn {
+  position: absolute;
+  top: 0.7rem;
+  right: 0.7rem;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease;
+}
+
+.project-card:hover .project-card-menu-btn { opacity: 1; }
+.project-card-menu-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.project-card-pin-badge {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  color: var(--gold);
+}
+
+.project-card { position: relative; }
