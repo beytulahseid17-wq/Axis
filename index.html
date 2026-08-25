@@ -382,6 +382,28 @@
             <div><h1>Projects</h1><p class="sub">Build project pages from reusable blocks — headings, notes, checklists.</p></div>
             <button type="button" class="calc-btn" id="new-project-btn">+ New Project</button>
           </div>
+          <div class="projects-tabs">
+            <button type="button" class="projects-tab active" data-filter="active">Active</button>
+            <button type="button" class="projects-tab" data-filter="archived">Archived</button>
+          </div>
+          <div id="project-card-menu" class="project-dots-menu hidden">
+            <button type="button" class="project-dots-item" id="card-menu-pin">
+              <svg class="pdi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-2-7V5a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v5z"/></svg>
+              <span id="card-menu-pin-label">Pin</span>
+            </button>
+            <button type="button" class="project-dots-item" id="card-menu-duplicate">
+              <svg class="pdi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Duplicate
+            </button>
+            <button type="button" class="project-dots-item" id="card-menu-archive">
+              <svg class="pdi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+              <span id="card-menu-archive-label">Archive</span>
+            </button>
+            <button type="button" class="project-dots-item danger" id="card-menu-delete">
+              <svg class="pdi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+              Delete
+            </button>
+          </div>
           <div id="projects-grid" class="projects-grid"></div>
         </div>
 
@@ -403,6 +425,29 @@
               <div class="view-edit-toggle" id="view-edit-toggle">
                 <button type="button" class="ve-toggle-btn active" data-mode="edit">Edit</button>
                 <button type="button" class="ve-toggle-btn" data-mode="view">View</button>
+              </div>
+              <div class="project-menu-wrap editor-only">
+                <button type="button" class="editor-icon-btn" id="project-menu-btn" title="More">
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+                </button>
+                <div id="project-menu" class="project-dots-menu hidden">
+                  <button type="button" class="project-dots-item" id="project-menu-pin">
+                    <svg class="pdi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="17" x2="12" y2="22"/><path d="M5 17h14l-2-7V5a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v5z"/></svg>
+                    <span id="project-menu-pin-label">Pin</span>
+                  </button>
+                  <button type="button" class="project-dots-item" id="project-menu-duplicate">
+                    <svg class="pdi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    Duplicate
+                  </button>
+                  <button type="button" class="project-dots-item" id="project-menu-archive">
+                    <svg class="pdi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="21 8 21 21 3 21 3 8"/><rect x="1" y="3" width="22" height="5"/><line x1="10" y1="12" x2="14" y2="12"/></svg>
+                    <span id="project-menu-archive-label">Archive</span>
+                  </button>
+                  <button type="button" class="project-dots-item danger" id="project-menu-delete">
+                    <svg class="pdi-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                    Delete
+                  </button>
+                </div>
               </div>
             </div>
           </div>
