@@ -1345,11 +1345,14 @@
   }
 
   function recentProjects() {
-    return state.projects.slice().sort(function (a, b) {
+    var active = state.projects.filter(function (p) { return !p.archived; });
+    var pinned = active.filter(function (p) { return p.pinned; });
+    var unpinned = active.filter(function (p) { return !p.pinned; }).sort(function (a, b) {
       var aT = a.last_opened_at || a.created_at || "";
       var bT = b.last_opened_at || b.created_at || "";
       return bT.localeCompare(aT);
-    }).slice(0, 4);
+    });
+    return pinned.concat(unpinned).slice(0, 4);
   }
 
   function buildRecentProjectCard(p) {
@@ -1388,6 +1391,8 @@
     });
   }
 
+  var projectsFilter = "active";
+
   function renderProjectsList() {
     var grid = document.getElementById("projects-grid");
     if (!grid) return;
@@ -1404,11 +1409,16 @@
   }
 
   function _renderProjectsGrid(grid) {
-    if (state.projects.length === 0) {
-      grid.innerHTML = '<p class="empty-note">No projects yet — create your first one.</p>';
+    var filtered = state.projects.filter(function (p) {
+      return projectsFilter === "archived" ? !!p.archived : !p.archived;
+    });
+
+    if (filtered.length === 0) {
+      grid.innerHTML = projectsFilter === "archived"
+        ? '<p class="empty-note">No archived projects.</p>'
+        : '<p class="empty-note">No projects yet — create your first one.</p>';
       return;
     }
-    // Get offline project ids to badge them
     var offlineIds = {};
     var loadOfflineIds = offlineReady
       ? AxisOffline.getOfflineProjects().then(function (recs) { recs.forEach(function (r) { offlineIds[r.project_id] = true; }); })
@@ -1416,27 +1426,40 @@
 
     loadOfflineIds.then(function () {
       grid.innerHTML = "";
-      state.projects.forEach(function (p) {
+      filtered.forEach(function (p) {
         var pct = projectProgress(p);
         var isOffline = !!offlineIds[p.id];
         var card = document.createElement("div");
         card.className = "project-card";
         card.innerHTML =
-          '<button type="button" class="project-card-remove" data-id="' + p.id + '">&times;</button>' +
+          (p.pinned ? '<span class="project-card-pin-badge" title="Pinned"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><line x1="12" y1="17" x2="12" y2="22" stroke="currentColor" stroke-width="2"/><path d="M5 17h14l-2-7V5a1 1 0 0 0-1-1H8a1 1 0 0 0-1 1v5z"/></svg></span>' : '') +
+          '<button type="button" class="project-card-menu-btn" data-id="' + p.id + '" aria-label="More">' +
+          '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg></button>' +
           '<div class="project-card-icon">' + iconSvg(p.icon) + '</div>' +
           '<p class="project-card-name">' + (p.name || "Untitled project") +
           (isOffline ? '<span class="project-card-offline-dot" title="Available offline"></span>' : '') + '</p>' +
           '<p class="project-card-sub">' + (p.subtitle || "No description yet") + '</p>' +
           '<div class="project-card-progress-row"><div class="bar-track"><div class="bar-fill" style="width:' + pct + '%;background:var(--accent);"></div></div><span class="project-card-progress-pct">' + pct + '%</span></div>';
         card.addEventListener("click", function (e) {
-          if (e.target.closest(".project-card-remove")) return;
+          if (e.target.closest(".project-card-menu-btn")) return;
           openProjectDetail(p.id);
         });
-        card.querySelector(".project-card-remove").addEventListener("click", function (e) {
+        card.querySelector(".project-card-menu-btn").addEventListener("click", function (e) {
           e.stopPropagation();
-          removeProject(p.id);
+          openProjectCardMenu(e.currentTarget, p.id);
         });
         grid.appendChild(card);
+      });
+    });
+  }
+
+  function initProjectsTabs() {
+    document.querySelectorAll(".projects-tab").forEach(function (tab) {
+      tab.addEventListener("click", function () {
+        document.querySelectorAll(".projects-tab").forEach(function (t) { t.classList.remove("active"); });
+        tab.classList.add("active");
+        projectsFilter = tab.getAttribute("data-filter");
+        renderProjectsList();
       });
     });
   }
@@ -1453,11 +1476,168 @@
       });
   }
 
-  function removeProject(id) {
+  function findProject(id) {
+    return state.projects.filter(function (p) { return p.id === id; })[0];
+  }
+
+  function togglePinProject(id) {
+    var project = findProject(id);
+    if (!project) return;
+    project.pinned = !project.pinned;
+    renderProjectsList(); renderProjectsPreview();
+    if (offlineReady) AxisOffline.put("projects", project);
+    if (isGuest()) return;
+    supabaseClient.from("projects").update({ pinned: project.pinned }).eq("id", id).then(function (res) {
+      if (res.error) console.error("Axis: pin project failed", res.error);
+    });
+  }
+
+  function setProjectArchived(id, archived) {
+    var project = findProject(id);
+    if (!project) return;
+    project.archived = archived;
+    if (archived) project.pinned = false;
+    renderProjectsList(); renderProjectsPreview();
+    if (offlineReady) AxisOffline.put("projects", project);
+    if (isGuest()) return;
+    supabaseClient.from("projects").update({ archived: archived, pinned: project.pinned }).eq("id", id).then(function (res) {
+      if (res.error) console.error("Axis: archive project failed", res.error);
+    });
+  }
+
+  function duplicateProjectFull(id) {
+    var project = findProject(id);
+    if (!project) return;
+    if (isGuest()) { openAuthGate("settings"); return; }
+    var userId = state.session.user.id;
+    var copy = {
+      user_id: userId,
+      name: (project.name || "Untitled project") + " (copy)",
+      subtitle: project.subtitle || "",
+      content: JSON.parse(JSON.stringify(project.content || [])).map(function (b) {
+        b.id = uid();
+        b.starred = false;
+        delete b.reusableId;
+        if (b.items) b.items.forEach(function (it) { it.id = uid(); });
+        return b;
+      }),
+      cover_url: project.cover_url || null,
+      icon: project.icon || "folder"
+    };
+    supabaseClient.from("projects").insert(copy).select().single().then(function (res) {
+      if (res.error) { console.error("Axis: duplicate project failed", res.error); return; }
+      state.projects.push(res.data);
+      renderProjectsList(); renderProjectsPreview();
+      openProjectDetail(res.data.id);
+    });
+  }
+
+  function deleteProjectPermanently(id) {
+    if (!confirm("Delete this project permanently? This can't be undone.")) return;
     state.projects = state.projects.filter(function (p) { return p.id !== id; });
     renderProjectsList(); renderProjectsPreview();
+    if (currentProjectId === id) closeProjectDetail();
+    if (offlineReady) AxisOffline.del("projects", id);
+    if (isGuest()) return;
     supabaseClient.from("projects").delete().eq("id", id).then(function (res) {
       if (res.error) console.error("Axis: remove project failed", res.error);
+    });
+  }
+
+  // ── Shared card ⋯ menu (Projects list) ──────────────────────────────────────
+  var pendingCardMenuProjectId = null;
+
+  function openProjectCardMenu(anchorBtn, projectId) {
+    var menu = document.getElementById("project-card-menu");
+    var project = findProject(projectId);
+    if (!project) return;
+    pendingCardMenuProjectId = projectId;
+
+    document.getElementById("card-menu-pin-label").textContent = project.pinned ? "Unpin" : "Pin";
+    document.getElementById("card-menu-archive-label").textContent = project.archived ? "Restore" : "Archive";
+
+    var rect = anchorBtn.getBoundingClientRect();
+    menu.style.top = (rect.bottom + 4) + "px";
+    menu.style.left = Math.max(8, rect.right - 170) + "px";
+    menu.classList.remove("hidden");
+  }
+
+  function closeProjectCardMenu() {
+    document.getElementById("project-card-menu").classList.add("hidden");
+    pendingCardMenuProjectId = null;
+  }
+
+  function initProjectCardMenu() {
+    document.getElementById("card-menu-pin").addEventListener("click", function () {
+      if (pendingCardMenuProjectId) togglePinProject(pendingCardMenuProjectId);
+      closeProjectCardMenu();
+    });
+    document.getElementById("card-menu-duplicate").addEventListener("click", function () {
+      if (pendingCardMenuProjectId) duplicateProjectFull(pendingCardMenuProjectId);
+      closeProjectCardMenu();
+    });
+    document.getElementById("card-menu-archive").addEventListener("click", function () {
+      if (pendingCardMenuProjectId) {
+        var project = findProject(pendingCardMenuProjectId);
+        if (project) setProjectArchived(pendingCardMenuProjectId, !project.archived);
+      }
+      closeProjectCardMenu();
+    });
+    document.getElementById("card-menu-delete").addEventListener("click", function () {
+      if (pendingCardMenuProjectId) deleteProjectPermanently(pendingCardMenuProjectId);
+      closeProjectCardMenu();
+    });
+    document.addEventListener("click", function (e) {
+      var menu = document.getElementById("project-card-menu");
+      if (!menu.classList.contains("hidden") && !menu.contains(e.target) && !e.target.closest(".project-card-menu-btn")) {
+        closeProjectCardMenu();
+      }
+    });
+  }
+
+  // ── Detail-view ⋯ menu (same actions, acts on the currently open project) ──
+  function updateProjectDetailMenuLabels() {
+    var project = currentProject();
+    if (!project) return;
+    var pinLabel = document.getElementById("project-menu-pin-label");
+    var archiveLabel = document.getElementById("project-menu-archive-label");
+    if (pinLabel) pinLabel.textContent = project.pinned ? "Unpin" : "Pin";
+    if (archiveLabel) archiveLabel.textContent = project.archived ? "Restore" : "Archive";
+  }
+
+  function initProjectDetailMenu() {
+    var menuBtn = document.getElementById("project-menu-btn");
+    var menu = document.getElementById("project-menu");
+    if (!menuBtn || !menu) return;
+
+    menuBtn.addEventListener("click", function (e) {
+      e.stopPropagation();
+      updateProjectDetailMenuLabels();
+      menu.classList.toggle("hidden");
+    });
+    document.addEventListener("click", function (e) {
+      if (!menu.classList.contains("hidden") && !menu.contains(e.target) && e.target !== menuBtn) {
+        menu.classList.add("hidden");
+      }
+    });
+    document.getElementById("project-menu-pin").addEventListener("click", function () {
+      if (currentProjectId) togglePinProject(currentProjectId);
+      menu.classList.add("hidden");
+    });
+    document.getElementById("project-menu-duplicate").addEventListener("click", function () {
+      if (currentProjectId) duplicateProjectFull(currentProjectId);
+      menu.classList.add("hidden");
+    });
+    document.getElementById("project-menu-archive").addEventListener("click", function () {
+      if (currentProjectId) {
+        var project = currentProject();
+        if (project) setProjectArchived(currentProjectId, !project.archived);
+      }
+      menu.classList.add("hidden");
+    });
+    document.getElementById("project-menu-delete").addEventListener("click", function () {
+      if (currentProjectId) deleteProjectPermanently(currentProjectId);
+      menu.classList.add("hidden");
     });
   }
 
@@ -2421,6 +2601,9 @@
 
   function initProjects() {
     document.getElementById("new-project-btn").addEventListener("click", addProject);
+    initProjectsTabs();
+    initProjectCardMenu();
+    initProjectDetailMenu();
 
     var desktopAddBtn = document.getElementById("desktop-new-project-btn");
     if (desktopAddBtn) desktopAddBtn.addEventListener("click", function () {
