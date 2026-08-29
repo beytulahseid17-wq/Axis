@@ -255,7 +255,8 @@
     trips: [],
     notes: [],
     projects: [],
-    reusableBlocks: []
+    reusableBlocks: [],
+    myTemplates: []
   };
 
   var TEMPLATES = [
@@ -744,13 +745,14 @@
       supabaseClient.from("trips").select("*").eq("user_id", userId).order("created_at"),
       supabaseClient.from("notes").select("*").eq("user_id", userId).order("created_at", { ascending: false }).limit(10),
       supabaseClient.from("projects").select("*").eq("user_id", userId).order("created_at"),
-      supabaseClient.from("reusable_blocks").select("*").eq("user_id", userId).order("created_at", { ascending: false })
+      supabaseClient.from("reusable_blocks").select("*").eq("user_id", userId).order("created_at", { ascending: false }),
+      supabaseClient.from("public_templates").select("*").eq("user_id", userId).order("created_at", { ascending: false })
     ];
 
     return Promise.all(calls).then(function (results) {
       var profileRes = results[0], habitsRes = results[1], entriesRes = results[2],
           finRes = results[3], txRes = results[4], goalsRes = results[5], tripsRes = results[6],
-          notesRes = results[7], projectsRes = results[8], reusableRes = results[9];
+          notesRes = results[7], projectsRes = results[8], reusableRes = results[9], myTemplatesRes = results[10];
 
       if (profileRes.data) {
         state.plan = profileRes.data.plan || "free";
@@ -782,6 +784,8 @@
       state.projects = projectsRes.data || [];
       if (reusableRes.error) console.error("Axis: reusable blocks fetch failed", reusableRes.error);
       state.reusableBlocks = reusableRes.data || [];
+      if (myTemplatesRes.error) console.error("Axis: my templates fetch failed", myTemplatesRes.error);
+      state.myTemplates = myTemplatesRes.data || [];
 
       // Persist to IndexedDB for offline access
       if (offlineReady) {
@@ -1638,6 +1642,187 @@
     document.getElementById("project-menu-delete").addEventListener("click", function () {
       if (currentProjectId) deleteProjectPermanently(currentProjectId);
       menu.classList.add("hidden");
+    });
+    document.getElementById("project-menu-publish").addEventListener("click", function () {
+      if (currentProjectId) openPublishModal(currentProjectId);
+      menu.classList.add("hidden");
+    });
+  }
+
+  // ==================== SAVE AS PUBLIC TEMPLATE ====================
+
+  var pendingPublishProjectId = null;
+  var pendingPublishCategory = null;
+
+  var TEMPLATE_BLOCK_TYPE_LABELS = {
+    title: "Title", heading: "Heading", text: "Text",
+    "bulleted-list": "List", "numbered-list": "List", task: "Task",
+    divider: "Divider", image: "Image", file: "File", link: "Link", table: "Table"
+  };
+
+  function templateBlockPreviewText(block) {
+    if (block.type === "divider") return "—";
+    if (LIST_TYPES.indexOf(block.type) !== -1) return (block.items || []).length + " item" + ((block.items || []).length === 1 ? "" : "s");
+    if (block.type === "table") return (block.rows || []).length + " row" + ((block.rows || []).length === 1 ? "" : "s");
+    if (block.type === "image") return block.caption || "Image";
+    if (block.type === "file") return block.filename || "File";
+    if (block.type === "link") return block.label || block.url || "Link";
+    return (block.text || "").trim() || "(empty)";
+  }
+
+  function showPublishStep(stepId) {
+    document.querySelectorAll(".publish-step").forEach(function (el) { el.classList.add("hidden"); });
+    document.getElementById(stepId).classList.remove("hidden");
+  }
+
+  function openPublishModal(projectId) {
+    if (isGuest()) { openAuthGate("settings"); return; }
+    var project = findProject(projectId);
+    if (!project) return;
+    pendingPublishProjectId = projectId;
+    pendingPublishCategory = null;
+
+    document.getElementById("publish-name-input").value = project.name || "";
+    document.getElementById("publish-desc-input").value = project.subtitle || "";
+    document.querySelectorAll(".publish-category-btn").forEach(function (b) { b.classList.remove("selected"); });
+    document.getElementById("publish-form-error").classList.add("hidden");
+
+    showPublishStep("publish-step-intro");
+    document.getElementById("publish-template-modal").classList.remove("hidden");
+  }
+
+  function closePublishModal() {
+    document.getElementById("publish-template-modal").classList.add("hidden");
+  }
+
+  function renderTemplatePreviewStep() {
+    var project = findProject(pendingPublishProjectId);
+    if (!project) return;
+    var name = document.getElementById("publish-name-input").value.trim();
+    var desc = document.getElementById("publish-desc-input").value.trim();
+
+    var coverEl = document.getElementById("publish-preview-cover");
+    coverEl.style.backgroundImage = project.cover_url ? "url(" + project.cover_url + ")" : "none";
+    document.getElementById("publish-preview-icon").innerHTML = iconSvg(project.icon);
+    document.getElementById("publish-preview-name").textContent = name || "Untitled template";
+    document.getElementById("publish-preview-category").textContent = pendingPublishCategory || "";
+    document.getElementById("publish-preview-desc").textContent = desc || "No description provided.";
+
+    var blocksWrap = document.getElementById("publish-preview-blocks");
+    var content = project.content || [];
+    if (content.length === 0) {
+      blocksWrap.innerHTML = '<p class="empty-note">This project has no blocks yet.</p>';
+    } else {
+      blocksWrap.innerHTML = content.map(function (b) {
+        return '<div class="template-preview-block-row"><span class="tpb-type-tag">' + (TEMPLATE_BLOCK_TYPE_LABELS[b.type] || b.type) + '</span><span>' + templateBlockPreviewText(b).replace(/</g, "&lt;") + '</span></div>';
+      }).join("");
+    }
+  }
+
+  function publishTemplateNow() {
+    var project = findProject(pendingPublishProjectId);
+    if (!project || isGuest()) return;
+    var name = document.getElementById("publish-name-input").value.trim();
+    var desc = document.getElementById("publish-desc-input").value.trim();
+    var userId = state.session.user.id;
+
+    var confirmBtn = document.getElementById("publish-confirm-btn");
+    confirmBtn.disabled = true;
+    confirmBtn.textContent = "Publishing…";
+
+    supabaseClient.from("public_templates").insert({
+      user_id: userId,
+      source_project_id: project.id,
+      name: name,
+      description: desc,
+      category: pendingPublishCategory,
+      icon: project.icon || "folder",
+      cover_url: project.cover_url || null,
+      content: JSON.parse(JSON.stringify(project.content || [])),
+      published: true
+    }).select().single().then(function (res) {
+      confirmBtn.disabled = false;
+      confirmBtn.textContent = "Publish Template";
+      if (res.error) { alert("Publishing failed: " + res.error.message); return; }
+      state.myTemplates.unshift(res.data);
+      renderMyTemplates();
+      showPublishStep("publish-step-success");
+    });
+  }
+
+  function renderMyTemplates() {
+    var wrap = document.getElementById("my-templates-grid");
+    if (!wrap) return;
+    if (state.myTemplates.length === 0) {
+      wrap.innerHTML = '<p class="empty-note">You haven\'t published any templates yet.</p>';
+      return;
+    }
+    wrap.innerHTML = "";
+    state.myTemplates.forEach(function (t) {
+      var card = document.createElement("div");
+      card.className = "my-template-card";
+      card.innerHTML =
+        '<div class="my-template-cover" style="' + (t.cover_url ? 'background-image:url(' + t.cover_url + ')' : '') + '"></div>' +
+        '<div class="my-template-body">' +
+        '<p class="my-template-name">' + t.name + '</p>' +
+        '<p class="my-template-category">' + t.category + '</p>' +
+        '<span class="my-template-status ' + (t.published ? "live" : "unpublished") + '">' + (t.published ? "Live in marketplace" : "Unpublished") + '</span>' +
+        '<button type="button" class="my-template-toggle-btn" data-id="' + t.id + '">' + (t.published ? "Unpublish" : "Publish Again") + '</button>' +
+        '</div>';
+      card.querySelector(".my-template-toggle-btn").addEventListener("click", function () { toggleTemplatePublished(t.id); });
+      wrap.appendChild(card);
+    });
+  }
+
+  function toggleTemplatePublished(templateId) {
+    var t = state.myTemplates.filter(function (x) { return x.id === templateId; })[0];
+    if (!t) return;
+    t.published = !t.published;
+    renderMyTemplates();
+    if (isGuest()) return;
+    supabaseClient.from("public_templates").update({ published: t.published }).eq("id", templateId).then(function (res) {
+      if (res.error) console.error("Axis: toggle template published failed", res.error);
+    });
+  }
+
+  function initPublishFlow() {
+    document.getElementById("card-menu-publish").addEventListener("click", function () {
+      if (pendingCardMenuProjectId) openPublishModal(pendingCardMenuProjectId);
+      closeProjectCardMenu();
+    });
+
+    document.getElementById("publish-cancel-1").addEventListener("click", closePublishModal);
+    document.getElementById("publish-continue-1").addEventListener("click", function () { showPublishStep("publish-step-form"); });
+    document.getElementById("publish-back-2").addEventListener("click", function () { showPublishStep("publish-step-intro"); });
+
+    document.querySelectorAll(".publish-category-btn").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        document.querySelectorAll(".publish-category-btn").forEach(function (b) { b.classList.remove("selected"); });
+        btn.classList.add("selected");
+        pendingPublishCategory = btn.getAttribute("data-category");
+      });
+    });
+
+    document.getElementById("publish-continue-2").addEventListener("click", function () {
+      var name = document.getElementById("publish-name-input").value.trim();
+      var errEl = document.getElementById("publish-form-error");
+      if (!name) { errEl.textContent = "Please give your template a name."; errEl.classList.remove("hidden"); return; }
+      if (!pendingPublishCategory) { errEl.textContent = "Please choose a category."; errEl.classList.remove("hidden"); return; }
+      errEl.classList.add("hidden");
+      renderTemplatePreviewStep();
+      showPublishStep("publish-step-preview");
+    });
+
+    document.getElementById("publish-back-3").addEventListener("click", function () { showPublishStep("publish-step-form"); });
+    document.getElementById("publish-confirm-btn").addEventListener("click", publishTemplateNow);
+    document.getElementById("publish-close-success").addEventListener("click", closePublishModal);
+    document.getElementById("publish-view-my-templates").addEventListener("click", function () {
+      closePublishModal();
+      goToPage("profile");
+    });
+
+    document.getElementById("publish-template-modal").addEventListener("click", function (e) {
+      if (e.target.id === "publish-template-modal") closePublishModal();
     });
   }
 
@@ -3450,6 +3635,7 @@
   // ==================== RENDER ALL ====================
 
   function renderProfile() {
+    renderMyTemplates();
     var isLoggedIn = !!state.session;
     var displayLabel = state.fullName || state.displayName;
     var initial = isLoggedIn
@@ -3570,7 +3756,7 @@
       initAuthGate, initResetFlow, initNav, initTheme, initFinancialCalculator,
       initDashboardToggle, initSettings, initCoach, initChestModal, initProfile,
       initStickyDashTopbar, initProjects, initFocusTimer, initDailyReflection, initDashPlanTabs,
-      initProjectOfflineToggle, initOfflineEngine, initProjectCoverAndIcon
+      initProjectOfflineToggle, initOfflineEngine, initProjectCoverAndIcon, initPublishFlow
     ];
     initializers.forEach(function (fn) {
       try { fn(); } catch (e) { console.error("Axis: " + fn.name + " failed to init", e); }
