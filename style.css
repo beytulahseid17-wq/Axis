@@ -3923,3 +3923,223 @@ body.project-view-mode .content-block:hover { background: none; }
 }
 
 .project-card { position: relative; }
+
+/* ============ Save as Public Template — publish flow ============ */
+
+.publish-modal-card { width: min(460px, 100%); text-align: left; max-height: 85vh; overflow-y: auto; }
+.publish-modal-card h2 { text-align: center; font-size: 1.2rem; margin-bottom: 0.4rem; }
+.publish-modal-card .auth-gate-sub { text-align: center; }
+
+.publish-illo { width: 100%; max-width: 220px; display: block; margin: 0 auto 1.1rem; border-radius: 14px; }
+
+.publish-privacy-note {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  margin: 1rem 0 0.25rem;
+  font-size: 0.82rem;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.publish-privacy-note svg { flex-shrink: 0; color: var(--accent); margin-top: 0.1rem; }
+
+.publish-step-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+  margin-top: 1.5rem;
+}
+
+.publish-step-actions .auth-gate-dismiss { margin: 0; }
+.publish-step-actions .calc-btn { margin: 0; }
+
+.fin-field-label { font-size: 0.82rem; font-weight: 600; color: var(--text); margin: 0.9rem 0 0.5rem; }
+
+.publish-category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+}
+
+.publish-category-btn {
+  background: var(--surface-2);
+  border: 1.5px solid var(--line);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 0.6rem;
+  font-size: 0.84rem;
+  cursor: pointer;
+}
+
+.publish-category-btn.selected {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+/* Preview listing card */
+.template-preview-listing {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  margin: 1rem 0;
+}
+
+.template-preview-cover {
+  height: 100px;
+  background: var(--surface-2);
+  background-size: cover;
+  background-position: center;
+}
+
+.template-preview-body { padding: 1.1rem; position: relative; }
+
+.template-preview-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 11px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -2.2rem;
+  margin-bottom: 0.6rem;
+  border: 3px solid var(--surface);
+}
+
+.template-preview-name { font-weight: 700; font-size: 1rem; margin: 0 0 0.35rem; }
+
+.template-preview-category {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border-radius: 999px;
+  padding: 0.2rem 0.6rem;
+  margin-bottom: 0.6rem;
+}
+
+.template-preview-desc { font-size: 0.83rem; color: var(--text-muted); line-height: 1.5; margin: 0 0 1rem; }
+
+.template-preview-structure-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  margin: 0 0 0.5rem;
+}
+
+.template-preview-blocks {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.template-preview-block-row {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-size: 0.8rem;
+  color: var(--text);
+  padding: 0.3rem 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.template-preview-block-row:last-child { border-bottom: none; }
+
+.tpb-type-tag {
+  font-size: 0.65rem;
+  font-family: var(--font-mono);
+  font-weight: 700;
+  color: var(--text-muted);
+  background: var(--surface-2);
+  border-radius: 5px;
+  padding: 0.15rem 0.4rem;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.publish-discover-note {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  text-align: center;
+  line-height: 1.5;
+  margin-top: 0.5rem;
+}
+
+.publish-success-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 1rem;
+}
+
+/* ============ My Templates (Profile page) ============ */
+
+.my-templates-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.my-template-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: var(--shadow-sm);
+}
+
+.my-template-cover {
+  height: 70px;
+  background: var(--surface-2);
+  background-size: cover;
+  background-position: center;
+}
+
+.my-template-body { padding: 0.9rem; }
+
+.my-template-name { font-weight: 700; font-size: 0.88rem; margin: 0 0 0.25rem; }
+.my-template-category { font-size: 0.68rem; color: var(--accent); font-weight: 700; margin: 0 0 0.6rem; }
+
+.my-template-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.15rem 0.55rem;
+  border-radius: 999px;
+  margin-bottom: 0.7rem;
+}
+
+.my-template-status.live { background: var(--accent-soft); color: var(--accent); }
+.my-template-status.unpublished { background: var(--surface-2); color: var(--text-muted); }
+
+.my-template-toggle-btn {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 0.45rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.my-template-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
