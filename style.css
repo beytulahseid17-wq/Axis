@@ -4143,3 +4143,137 @@ body.project-view-mode .content-block:hover { background: none; }
 }
 
 .my-template-toggle-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ============ Habit page — desktop weekly table ============ */
+
+.habit-week-table-wrap { overflow-x: auto; }
+
+.habit-week-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 560px;
+}
+
+.habit-week-table th {
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.5rem 0.4rem;
+  text-align: center;
+}
+
+.habit-week-table th.habit-col-header { text-align: left; padding-left: 0.2rem; }
+.habit-week-table th.today-col { color: var(--accent); }
+
+.habit-week-table td {
+  padding: 0.5rem 0.4rem;
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+
+.habit-name-cell {
+  text-align: left !important;
+  padding-left: 0.2rem !important;
+  cursor: pointer;
+  font-size: 0.87rem;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+}
+
+.habit-name-cell:hover { color: var(--accent); }
+
+.habit-name-cell .habit-name-streak {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-top: 0.1rem;
+}
+
+.week-check-btn {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  padding: 0;
+  color: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.week-check-btn.done {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.week-check-btn.future {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.week-check-btn svg { width: 13px; height: 13px; }
+
+/* ============ Habit page — mobile add button ============ */
+
+.habit-add-fab {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* ============ Habit detail view ============ */
+
+.habit-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+}
+
+.habit-detail-header h1 { margin: 0; }
+
+.habit-history-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 0.5rem;
+}
+
+.habit-history-cell {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1.5px solid var(--line);
+  background: var(--surface-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-family: var(--font-mono);
+}
+
+.habit-history-cell.done {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+  font-weight: 700;
+}
+
+.habit-history-cell.future { opacity: 0.35; cursor: default; }
