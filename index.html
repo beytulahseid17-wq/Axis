@@ -727,10 +727,46 @@
 
       <!-- Daily -->
       <section data-page="daily" class="page hidden">
-        <h1>Daily</h1>
-        <p class="sub">What you're tracking today.</p>
-        <div id="daily-analytics" class="daily-analytics animate-in"></div>
-        <div id="daily-list" class="module animate-in"></div>
+
+        <div id="daily-list-view">
+          <div class="page-header-row">
+            <div><h1>Habits</h1><p class="sub">What you're tracking, day by day.</p></div>
+            <button type="button" class="calc-btn desktop-only" id="new-habit-btn">+ New Habit</button>
+            <button type="button" class="habit-add-fab mobile-only" id="new-habit-btn-mobile" aria-label="New habit">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            </button>
+          </div>
+
+          <div id="daily-analytics" class="daily-analytics animate-in"></div>
+
+          <!-- Desktop: weekly table -->
+          <div class="module animate-in desktop-only habit-week-table-wrap">
+            <table class="habit-week-table" id="habit-week-table"></table>
+          </div>
+
+          <!-- Mobile: compact list (same pattern as Today's Plan) -->
+          <div id="habit-mobile-list" class="module animate-in mobile-only"></div>
+        </div>
+
+        <div id="habit-detail-view" class="hidden">
+          <a href="#" class="back-link" id="habit-back-link">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            All Habits
+          </a>
+
+          <div class="habit-detail-header">
+            <h1 id="habit-detail-name">Habit name</h1>
+            <button type="button" class="danger-btn" id="habit-delete-btn">Delete habit</button>
+          </div>
+
+          <div class="daily-analytics animate-in" id="habit-detail-stats"></div>
+
+          <div class="module animate-in">
+            <p class="module-title">Last 4 weeks</p>
+            <div id="habit-history-grid" class="habit-history-grid"></div>
+          </div>
+        </div>
+
       </section>
 
       <!-- Templates -->
