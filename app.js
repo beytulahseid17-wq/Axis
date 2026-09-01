@@ -865,36 +865,40 @@
     });
   }
 
-  function toggleHabit(habitId) {
-    var today = dateStr(0);
-    var currentlyDone = isDone(habitId, 0);
+  function toggleHabitForDate(habitId, targetDate) {
+    var isToday = targetDate === dateStr(0);
+    var currentlyDone = !!(state.entriesByHabit[habitId] && state.entriesByHabit[habitId][targetDate]);
 
     if (!state.entriesByHabit[habitId]) state.entriesByHabit[habitId] = {};
-    if (currentlyDone) delete state.entriesByHabit[habitId][today];
-    else state.entriesByHabit[habitId][today] = true;
+    if (currentlyDone) delete state.entriesByHabit[habitId][targetDate];
+    else state.entriesByHabit[habitId][targetDate] = true;
 
-    adjustCoins(currentlyDone ? -1 : 1);
+    if (isToday) adjustCoins(currentlyDone ? -1 : 1);
     renderDaily(); renderDashboard(); renderAnalytics(); renderTopbar();
+    if (document.getElementById("habit-detail-view") && !document.getElementById("habit-detail-view").classList.contains("hidden")) renderHabitDetail();
     if (isGuest()) { saveGuestState(); return; }
 
-    var entryRecord = { id: habitId + "_" + today, habit_id: habitId, user_id: state.session.user.id, entry_date: today, completed: !currentlyDone };
+    var entryId = habitId + "_" + targetDate;
+    var entryRecord = { id: entryId, habit_id: habitId, user_id: state.session.user.id, entry_date: targetDate, completed: !currentlyDone };
     if (!currentlyDone && offlineReady) AxisOffline.put("habit_entries", entryRecord);
-    else if (currentlyDone && offlineReady) AxisOffline.del("habit_entries", habitId + "_" + today);
+    else if (currentlyDone && offlineReady) AxisOffline.del("habit_entries", entryId);
 
     if (!navigator.onLine) {
-      enqueueIfOffline("habit_entries", currentlyDone ? "delete" : "upsert", currentlyDone ? null : entryRecord, currentlyDone ? (habitId + "_" + today) : null);
+      enqueueIfOffline("habit_entries", currentlyDone ? "delete" : "upsert", currentlyDone ? null : entryRecord, currentlyDone ? entryId : null);
       return;
     }
     var userId = state.session.user.id;
     var query = currentlyDone
-      ? supabaseClient.from("habit_entries").delete().eq("habit_id", habitId).eq("entry_date", today)
-      : supabaseClient.from("habit_entries").insert({ user_id: userId, habit_id: habitId, entry_date: today, completed: true });
+      ? supabaseClient.from("habit_entries").delete().eq("habit_id", habitId).eq("entry_date", targetDate)
+      : supabaseClient.from("habit_entries").insert({ user_id: userId, habit_id: habitId, entry_date: targetDate, completed: true });
     query.then(function (res) {
-      if (res.error) enqueueIfOffline("habit_entries", currentlyDone ? "delete" : "upsert", currentlyDone ? null : entryRecord, currentlyDone ? (habitId + "_" + today) : null);
+      if (res.error) enqueueIfOffline("habit_entries", currentlyDone ? "delete" : "upsert", currentlyDone ? null : entryRecord, currentlyDone ? entryId : null);
     });
   }
 
-  function buildHabitListEl(habits) {
+  function toggleHabit(habitId) { toggleHabitForDate(habitId, dateStr(0)); }
+
+  function buildHabitListEl(habits, enableDetailClick) {
     var list = document.createElement("div");
     list.className = "habit-list";
     if (habits.length === 0) {
@@ -911,8 +915,12 @@
       row.querySelector(".habit-name").textContent = h.name;
       var streak = habitStreak(h.id);
       row.querySelector(".habit-streak").textContent = streak > 0 ? streak + "d streak" : "";
-      row.querySelector(".habit-check").addEventListener("click", function () { toggleHabit(h.id); });
-      row.querySelector(".habit-remove").addEventListener("click", function () { removeHabit(h.id); });
+      row.querySelector(".habit-check").addEventListener("click", function (e) { e.stopPropagation(); toggleHabit(h.id); });
+      row.querySelector(".habit-remove").addEventListener("click", function (e) { e.stopPropagation(); removeHabit(h.id); });
+      if (enableDetailClick) {
+        row.style.cursor = "pointer";
+        row.addEventListener("click", function () { openHabitDetail(h.id); });
+      }
       list.appendChild(row);
     });
     return list;
@@ -930,20 +938,158 @@
     return addRow;
   }
 
+  // ── Habit page: week helpers ────────────────────────────────────────────────
+  function weekDates() {
+    var todayIso = (new Date().getDay() + 6) % 7; // Mon=0 ... Sun=6
+    var labels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    var days = [];
+    for (var c = 0; c < 7; c++) {
+      var offset = todayIso - c;
+      var d = new Date(); d.setDate(d.getDate() - offset);
+      days.push({
+        offset: offset,
+        dateStr: dateStr(offset),
+        label: labels[c],
+        dayNum: d.getDate(),
+        isToday: offset === 0,
+        isFuture: offset < 0
+      });
+    }
+    return days;
+  }
+
+  function renderHabitWeekTable() {
+    var table = document.getElementById("habit-week-table");
+    if (!table) return;
+    var habits = dailyHabits();
+    var days = weekDates();
+
+    if (habits.length === 0) {
+      table.innerHTML = '<tr><td class="empty-note" style="padding:1.5rem 0;">Nothing tracked here yet — add your first habit above.</td></tr>';
+      return;
+    }
+
+    var head = "<tr><th class=\"habit-col-header\">Habit</th>" + days.map(function (d) {
+      return '<th class="' + (d.isToday ? "today-col" : "") + '">' + d.label + '<br>' + d.dayNum + '</th>';
+    }).join("") + "</tr>";
+
+    var rows = habits.map(function (h) {
+      var streak = habitStreak(h.id);
+      var nameCell = '<td class="habit-name-cell" data-habit="' + h.id + '">' + h.name +
+        (streak > 0 ? '<span class="habit-name-streak">' + streak + 'd streak</span>' : '') + '</td>';
+      var cells = days.map(function (d) {
+        var done = !d.isFuture && isDone(h.id, d.offset);
+        var checkSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><polyline points="20 6 9 17 4 12"/></svg>';
+        return '<td><button type="button" class="week-check-btn' + (done ? " done" : "") + (d.isFuture ? " future" : "") + '" data-habit="' + h.id + '" data-date="' + d.dateStr + '"' + (d.isFuture ? " disabled" : "") + '>' + (done ? checkSvg : "") + '</button></td>';
+      }).join("");
+      return "<tr>" + nameCell + cells + "</tr>";
+    }).join("");
+
+    table.innerHTML = head + rows;
+
+    table.querySelectorAll(".habit-name-cell").forEach(function (cell) {
+      cell.addEventListener("click", function () { openHabitDetail(cell.getAttribute("data-habit")); });
+    });
+    table.querySelectorAll(".week-check-btn:not(.future)").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        toggleHabitForDate(btn.getAttribute("data-habit"), btn.getAttribute("data-date"));
+      });
+    });
+  }
+
+  function renderHabitMobileList() {
+    var wrap = document.getElementById("habit-mobile-list");
+    if (!wrap) return;
+    var habits = dailyHabits();
+    wrap.innerHTML = "";
+    wrap.appendChild(buildHabitListEl(habits, true));
+    wrap.appendChild(buildAddRow(addHabit, "Add a habit…"));
+  }
+
+  // ── Habit detail / history ──────────────────────────────────────────────────
+  var currentHabitId = null;
+
+  function openHabitDetail(habitId) {
+    currentHabitId = habitId;
+    document.getElementById("daily-list-view").classList.add("hidden");
+    document.getElementById("habit-detail-view").classList.remove("hidden");
+    renderHabitDetail();
+  }
+
+  function closeHabitDetail() {
+    currentHabitId = null;
+    document.getElementById("habit-detail-view").classList.add("hidden");
+    document.getElementById("daily-list-view").classList.remove("hidden");
+    renderDaily();
+  }
+
+  function renderHabitDetail() {
+    var habit = state.habits.filter(function (h) { return h.id === currentHabitId; })[0];
+    if (!habit) { closeHabitDetail(); return; }
+
+    document.getElementById("habit-detail-name").textContent = habit.name;
+
+    var streak = habitStreak(habit.id);
+    var doneLast28 = 0;
+    for (var i = 0; i < 28; i++) { if (isDone(habit.id, i)) doneLast28++; }
+    document.getElementById("habit-detail-stats").innerHTML =
+      statCard(streak, "Current streak") +
+      statCard(doneLast28 + "/28", "Last 4 weeks") +
+      statCard(Math.round((doneLast28 / 28) * 100) + "%", "Consistency");
+
+    var grid = document.getElementById("habit-history-grid");
+    grid.innerHTML = "";
+    for (var offset = 27; offset >= 0; offset--) {
+      var d = new Date(); d.setDate(d.getDate() - offset);
+      var done = isDone(habit.id, offset);
+      var cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "habit-history-cell" + (done ? " done" : "");
+      cell.textContent = d.getDate();
+      cell.title = dateStr(offset);
+      cell.addEventListener("click", function (capturedOffset) {
+        return function () { toggleHabitForDate(habit.id, dateStr(capturedOffset)); };
+      }(offset));
+      grid.appendChild(cell);
+    }
+  }
+
+  function initHabitPage() {
+    document.getElementById("new-habit-btn").addEventListener("click", function () {
+      var name = prompt("Habit name?");
+      if (name && name.trim()) addHabit(name.trim());
+    });
+    document.getElementById("new-habit-btn-mobile").addEventListener("click", function () {
+      var name = prompt("Habit name?");
+      if (name && name.trim()) addHabit(name.trim());
+    });
+    document.getElementById("habit-back-link").addEventListener("click", function (e) {
+      e.preventDefault();
+      closeHabitDetail();
+    });
+    document.getElementById("habit-delete-btn").addEventListener("click", function () {
+      if (!currentHabitId) return;
+      if (!confirm("Delete this habit and its history? This can't be undone.")) return;
+      removeHabit(currentHabitId);
+      closeHabitDetail();
+    });
+  }
+
   function renderDaily() {
     var habits = dailyHabits();
     var doneCount = habits.filter(function (h) { return isDone(h.id, 0); }).length;
     var bestStreak = habits.reduce(function (max, h) { return Math.max(max, habitStreak(h.id)); }, 0);
 
-    document.getElementById("daily-analytics").innerHTML =
-      statCard(doneCount + "/" + habits.length, "Done today") +
-      statCard(bestStreak, "Best streak") +
-      statCard(habits.length, "Tracked");
+    var analyticsEl = document.getElementById("daily-analytics");
+    if (analyticsEl) {
+      analyticsEl.innerHTML =
+        statCard(doneCount + "/" + habits.length, "Done today") +
+        statCard(bestStreak, "Best streak") +
+        statCard(habits.length, "Tracked");
+    }
 
-    var listWrap = document.getElementById("daily-list");
-    listWrap.innerHTML = "";
-    listWrap.appendChild(buildHabitListEl(habits));
-    listWrap.appendChild(buildAddRow(addHabit, "Add something to track…"));
+    renderHabitWeekTable();
+    renderHabitMobileList();
   }
 
   // ==================== HOME ====================
@@ -3756,7 +3902,7 @@
       initAuthGate, initResetFlow, initNav, initTheme, initFinancialCalculator,
       initDashboardToggle, initSettings, initCoach, initChestModal, initProfile,
       initStickyDashTopbar, initProjects, initFocusTimer, initDailyReflection, initDashPlanTabs,
-      initProjectOfflineToggle, initOfflineEngine, initProjectCoverAndIcon, initPublishFlow
+      initProjectOfflineToggle, initOfflineEngine, initProjectCoverAndIcon, initPublishFlow, initHabitPage
     ];
     initializers.forEach(function (fn) {
       try { fn(); } catch (e) { console.error("Axis: " + fn.name + " failed to init", e); }
